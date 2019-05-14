@@ -16,7 +16,9 @@
 #ifndef SWOOLE_POSTGRESQL_H_
 #define SWOOLE_POSTGRESQL_H_
 
+#include "ext/swoole/config.h"
 #include "php_swoole_cxx.h"
+
 #include <libpq-fe.h>
 
 typedef enum
