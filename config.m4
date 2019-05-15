@@ -43,7 +43,7 @@ fi
 if test "$PHP_swoole_postgresql" != "no"; then
 
     PHP_ADD_LIBRARY(pthread)
-    PHP_SUBST(swoole_postgresql_SHARED_LIBADD)
+    PHP_SUBST(SWOOLE_POSTGRESQL_SHARED_LIBADD)
 
     AC_CHECK_LIB(pq, PQconnectdb, AC_DEFINE(HAVE_POSTGRESQL, 1, [have postgresql]))
 
@@ -88,7 +88,7 @@ if test "$PHP_swoole_postgresql" != "no"; then
             done
         fi
         AC_DEFINE(SW_USE_POSTGRESQL, 1, [enable coroutine-postgresql support])
-        PHP_ADD_LIBRARY(pq, 1, SWOOLE_SHARED_LIBADD)
+        PHP_ADD_LIBRARY(pq, 1, SWOOLE_POSTGRESQL_SHARED_LIBADD)
     fi
     if test -z "$PGSQL_INCLUDE"; then
         AC_MSG_ERROR(Cannot find libpq-fe.h. Please confirm the libpq or specify correct PostgreSQL(libpq) installation path)
@@ -97,7 +97,7 @@ if test "$PHP_swoole_postgresql" != "no"; then
     CFLAGS="-Wall -pthread $CFLAGS"
     LDFLAGS="$LDFLAGS -lpthread"
 
-    PHP_ADD_LIBRARY(pthread, 1, SWOOLE_SHARED_LIBADD)
+    PHP_ADD_LIBRARY(pthread, 1, SWOOLE_POSTGRESQL_SHARED_LIBADD)
 
     swoole_source_file="swoole_postgresql_coro.cc"
 
