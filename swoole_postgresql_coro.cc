@@ -223,6 +223,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
     object->conn = pgsql;
     object->timeout = SW_PGSQL_CONNECT_TIMEOUT;
     object->status = CONNECTION_STARTED;
+    
 
     PQsetnonblocking(pgsql , 1);
 
@@ -587,6 +588,7 @@ static PHP_METHOD(swoole_postgresql_coro, query)
     pg_object *object = (pg_object *) swoole_get_object(getThis());
     object->request_type = NORMAL_QUERY;
     pgsql = object->conn;
+    object->object = getThis();
 
     while ((pgsql_result = PQgetResult(pgsql)))
     {
@@ -629,6 +631,7 @@ static PHP_METHOD(swoole_postgresql_coro, prepare)
     pg_object *object = (pg_object *) swoole_get_object(getThis());
     object->request_type = PREPARE;
     pgsql = object->conn;
+    object->object = getThis();
 
 
     is_non_blocking = PQisnonblocking(pgsql);
@@ -690,6 +693,7 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
     pg_object *object = (pg_object *) swoole_get_object(getThis());
     object->request_type = NORMAL_QUERY;
     pgsql = object->conn;
+    object->object = getThis();
 
 
     is_non_blocking = PQisnonblocking(pgsql);
@@ -916,6 +920,7 @@ static PHP_METHOD(swoole_postgresql_coro, metaData)
     pg_object *object = (pg_object *) swoole_get_object(getThis());
     object->request_type = META_DATA;
     pgsql = object->conn;
+    object->object = getThis();
 
     while ((pg_result = PQgetResult(pgsql)))
     {
