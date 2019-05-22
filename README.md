@@ -1,4 +1,4 @@
-###install
+### install
 
  1. Make sure you have installed the latest version of swoole (swoole version >= 4.4)
 
