@@ -18,6 +18,7 @@
 
 #include "ext/swoole/config.h"
 #include "php_swoole_cxx.h"
+#include "config.h"
 
 #include <libpq-fe.h>
 
