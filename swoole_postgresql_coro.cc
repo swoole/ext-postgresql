@@ -266,7 +266,7 @@ static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode)
     const char *feedback;
     char *err_msg;
 
-    ZVAL_BOOL(result, 0);
+    ZVAL_FALSE(result);
 
     zval _zobject = ctx->coro_params;
     zval *zobject = &_zobject;
@@ -1260,7 +1260,7 @@ static int swoole_pgsql_coro_onError(swReactor *reactor, swEvent *event)
     zval *retval = NULL;
     zval *zobject = object->object;
 
-    ZVAL_BOOL(result, 0);
+    ZVAL_FALSE(result);
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(zobject, 0);
     zend_update_property_string(swoole_postgresql_coro_ce, zobject, "error", 5, "onerror");
