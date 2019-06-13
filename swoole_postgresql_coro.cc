@@ -205,11 +205,11 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
 
     php_swoole_check_reactor();
 
-    if (!swReactor_handle_isset(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL))
+    if (!swReactor_isset_handler(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL))
     {
-        SwooleG.main_reactor->setHandle(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
-        SwooleG.main_reactor->setHandle(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
-        SwooleG.main_reactor->setHandle(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
+        swReactor_set_handler(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
+        swReactor_set_handler(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
+        swReactor_set_handler(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
     }
 
     if (SwooleG.main_reactor->add(SwooleG.main_reactor, fd, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE) < 0)
@@ -267,7 +267,7 @@ static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode)
     const char *feedback;
     char *err_msg;
 
-    ZVAL_BOOL(result, 0);
+    ZVAL_FALSE(result);
 
     zval _zobject = ctx->coro_params;
     zval *zobject = &_zobject;
@@ -1265,7 +1265,7 @@ static int swoole_pgsql_coro_onError(swReactor *reactor, swEvent *event)
     zval *retval = NULL;
     zval *zobject = object->object;
 
-    ZVAL_BOOL(result, 0);
+    ZVAL_FALSE(result);
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(zobject, 0);
     zend_update_property_string(swoole_postgresql_coro_ce, zobject, "error", 5, "onerror");
