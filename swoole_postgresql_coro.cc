@@ -182,8 +182,8 @@ static PHP_METHOD(swoole_postgresql_coro, __construct)
 {
     pg_object *pg = (pg_object *) emalloc(sizeof(pg_object));
     bzero(pg, sizeof(pg_object));
-    pg->object = getThis();
-    swoole_set_object(getThis(), pg);
+    pg->object = ZEND_THIS;
+    swoole_set_object(ZEND_THIS, pg);
 }
 
 static PHP_METHOD(swoole_postgresql_coro, connect)
@@ -198,7 +198,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
     pgsql = PQconnectStart(Z_STRVAL_P(conninfo));
     int fd =  PQsocket(pgsql);
 
-    if (unlikely(fd < 0))
+    if (sw_unlikely(fd < 0))
     {
         RETURN_FALSE;
     }
@@ -218,7 +218,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
         RETURN_FALSE;
     }
 
-    pg_object *object = (pg_object *) swoole_get_object(getThis());
+    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
     object->fd = fd;
     object->conn = pgsql;
     object->timeout = SW_PGSQL_CONNECT_TIMEOUT;
@@ -241,14 +241,14 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
     _socket->object = object;
     _socket->active = 0;
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(getThis(), 0);
+    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
     if (!context)
     {
         context = (php_coro_context *) emalloc(sizeof(php_coro_context));
-        swoole_set_property(getThis(), 0, context);
+        swoole_set_property(ZEND_THIS, 0, context);
     }
     context->state = SW_CORO_CONTEXT_RUNNING;
-    context->coro_params = *getThis();
+    context->coro_params = *ZEND_THIS;
 
     if (object->timeout > 0)
     {
@@ -585,10 +585,10 @@ static PHP_METHOD(swoole_postgresql_coro, query)
         Z_PARAM_ZVAL(query)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(getThis());
+    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
     object->request_type = NORMAL_QUERY;
     pgsql = object->conn;
-    object->object = getThis();
+    object->object = ZEND_THIS;
 
     while ((pgsql_result = PQgetResult(pgsql)))
     {
@@ -603,9 +603,9 @@ static PHP_METHOD(swoole_postgresql_coro, query)
 
     }
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(getThis(), 0);
+    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
     context->state = SW_CORO_CONTEXT_RUNNING;
-    context->coro_params = *getThis();
+    context->coro_params = *ZEND_THIS;
 
     //TODO:  add the timeout
     /*
@@ -628,10 +628,10 @@ static PHP_METHOD(swoole_postgresql_coro, prepare)
         Z_PARAM_ZVAL(query)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(getThis());
+    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
     object->request_type = PREPARE;
     pgsql = object->conn;
-    object->object = getThis();
+    object->object = ZEND_THIS;
 
 
     is_non_blocking = PQisnonblocking(pgsql);
@@ -660,9 +660,9 @@ static PHP_METHOD(swoole_postgresql_coro, prepare)
     }
 
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(getThis(), 0);
+    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
     context->state = SW_CORO_CONTEXT_RUNNING;
-    context->coro_params = *getThis();
+    context->coro_params = *ZEND_THIS;
 
     //TODO:  add the timeout
     /*
@@ -690,10 +690,10 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
         Z_PARAM_ZVAL(pv_param_arr)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(getThis());
+    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
     object->request_type = NORMAL_QUERY;
     pgsql = object->conn;
-    object->object = getThis();
+    object->object = ZEND_THIS;
 
 
     is_non_blocking = PQisnonblocking(pgsql);
@@ -752,9 +752,9 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
         }
     }
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(getThis(), 0);
+    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
     context->state = SW_CORO_CONTEXT_RUNNING;
-    context->coro_params = *getThis();
+    context->coro_params = *ZEND_THIS;
 
     //TODO:  add the timeout
     /*
@@ -917,10 +917,10 @@ static PHP_METHOD(swoole_postgresql_coro, metaData)
         Z_PARAM_STRING(table_name, table_name_len)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(getThis());
+    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
     object->request_type = META_DATA;
     pgsql = object->conn;
-    object->object = getThis();
+    object->object = ZEND_THIS;
 
     while ((pg_result = PQgetResult(pgsql)))
     {
@@ -1003,9 +1003,9 @@ static PHP_METHOD(swoole_postgresql_coro, metaData)
     }
     smart_str_free(&querystr);
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(getThis(), 0);
+    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
     context->state = SW_CORO_CONTEXT_RUNNING;
-    context->coro_params = *getThis();
+    context->coro_params = *ZEND_THIS;
         /*
             if (pg_object->timeout > 0)
             {
@@ -1284,7 +1284,7 @@ static PHP_METHOD(swoole_postgresql_coro, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    swoole_postgresql_coro_close(getThis());
+    swoole_postgresql_coro_close(ZEND_THIS);
 }
 
 static int swoole_postgresql_coro_close(zval *zobject)
