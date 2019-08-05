@@ -247,7 +247,6 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
         context = (php_coro_context *) emalloc(sizeof(php_coro_context));
         swoole_set_property(ZEND_THIS, 0, context);
     }
-    context->state = SW_CORO_CONTEXT_RUNNING;
     context->coro_params = *ZEND_THIS;
 
     if (object->timeout > 0)
@@ -604,7 +603,6 @@ static PHP_METHOD(swoole_postgresql_coro, query)
     }
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
-    context->state = SW_CORO_CONTEXT_RUNNING;
     context->coro_params = *ZEND_THIS;
 
     //TODO:  add the timeout
@@ -661,7 +659,6 @@ static PHP_METHOD(swoole_postgresql_coro, prepare)
 
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
-    context->state = SW_CORO_CONTEXT_RUNNING;
     context->coro_params = *ZEND_THIS;
 
     //TODO:  add the timeout
@@ -753,7 +750,6 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
     }
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
-    context->state = SW_CORO_CONTEXT_RUNNING;
     context->coro_params = *ZEND_THIS;
 
     //TODO:  add the timeout
@@ -1004,7 +1000,6 @@ static PHP_METHOD(swoole_postgresql_coro, metaData)
     smart_str_free(&querystr);
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
-    context->state = SW_CORO_CONTEXT_RUNNING;
     context->coro_params = *ZEND_THIS;
         /*
             if (pg_object->timeout > 0)
