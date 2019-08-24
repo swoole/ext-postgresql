@@ -1288,7 +1288,7 @@ static int swoole_postgresql_coro_close(zval *zobject)
     }
     SwooleG.main_reactor->del(SwooleG.main_reactor, object->fd);
     
-    swSocket *_socket = swReactor_get(SwooleG.main_reactor, object->fd);
+    swConnection *_socket = swReactor_get(SwooleG.main_reactor, object->fd);
     if (_socket->object)
     {
         PGresult *res;
