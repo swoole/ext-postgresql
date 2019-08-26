@@ -205,14 +205,14 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
 
     php_swoole_check_reactor();
 
-    if (!swReactor_isset_handler(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL))
+    if (!swReactor_isset_handler(SwooleTG.reactor, PHP_SWOOLE_FD_POSTGRESQL))
     {
-        swReactor_set_handler(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
-        swReactor_set_handler(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
-        swReactor_set_handler(SwooleG.main_reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
+        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
+        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
+        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
     }
 
-    if (SwooleG.main_reactor->add(SwooleG.main_reactor, fd, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE) < 0)
+    if (SwooleTG.reactor->add(SwooleTG.reactor, fd, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE) < 0)
     {
         php_swoole_fatal_error(E_WARNING, "swoole_event_add failed");
         RETURN_FALSE;
@@ -247,7 +247,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
 
     if (object->timeout > 0)
     {
-        object->timer = swTimer_add(&SwooleG.timer, (long) (object->timeout * 1000), 0, context, swoole_pgsql_coro_onTimeout);
+        object->timer = swoole_timer_add((long) (object->timeout * 1000), 0, swoole_pgsql_coro_onTimeout, context);
     }
     PHPCoroutine::yield_m(return_value, context);
 }
@@ -309,7 +309,7 @@ static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event)
     char *err_msg;
     if (event->socket->object)
     {
-        return swReactor_onWrite(SwooleG.main_reactor, event);
+        return swReactor_onWrite(SwooleTG.reactor, event);
     }
 
     socklen_t len = sizeof(SwooleG.error);
@@ -323,7 +323,7 @@ static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event)
 
     if (object->timer)
     {
-        swTimer_del(&SwooleG.timer, object->timer);
+        swoole_timer_del(object->timer);
         object->timer = NULL;
     }
 
@@ -368,7 +368,7 @@ static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event)
 
     }
     //listen read event
-    SwooleG.main_reactor->set(SwooleG.main_reactor, event->fd, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ);
+    SwooleTG.reactor->set(SwooleTG.reactor, event->fd, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ);
     //connected
     event->socket->object = object;
 
@@ -396,7 +396,7 @@ static int swoole_pgsql_coro_onRead(swReactor *reactor, swEvent *event)
 
     if (object->timer)
     {
-        swTimer_del(&SwooleG.timer, object->timer);
+        swoole_timer_del(object->timer);
         object->timer = NULL;
     }
 
@@ -1286,9 +1286,9 @@ static int swoole_postgresql_coro_close(zval *zobject)
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_postgresql_coro");
         return FAILURE;
     }
-    SwooleG.main_reactor->del(SwooleG.main_reactor, object->fd);
+    SwooleTG.reactor->del(SwooleTG.reactor, object->fd);
     
-    swSocket *_socket = swReactor_get(SwooleG.main_reactor, object->fd);
+    swSocket *_socket = swReactor_get(SwooleTG.reactor, object->fd);
     if (_socket->object)
     {
         PGresult *res;
