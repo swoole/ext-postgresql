@@ -515,7 +515,6 @@ static int query_result_parse(pg_object *object)
     php_coro_context *context = (php_coro_context *) swoole_get_property(object->object, 0);
 
     pgsql_result = PQgetResult(object->conn);
-
     status = PQresultStatus(pgsql_result);
 
     switch (status)
@@ -527,6 +526,7 @@ static int query_result_parse(pg_object *object)
         err_msg = PQerrorMessage(object->conn);
         PQclear(pgsql_result);
         ZVAL_FALSE(&return_value);
+        swoole_event_del(object->fd);
         zend_update_property_string(swoole_postgresql_coro_ce, object->object, "error", 5, err_msg);
         ret = PHPCoroutine::resume_m(context, &return_value, retval);
         if (ret == SW_CORO_ERR_END && retval)
@@ -540,7 +540,7 @@ static int query_result_parse(pg_object *object)
         object->row = 0;
         /* Wait to finish sending buffer */
         res = PQflush(object->conn);
-
+        swoole_event_del(object->fd);
         ZVAL_RES(&return_value, zend_register_resource(object, le_result));
         zend_update_property_null(swoole_postgresql_coro_ce, object->object, "error", 5);
         ret = PHPCoroutine::resume_m(context, &return_value, retval);

@@ -16,6 +16,14 @@ go(function () {
     }
     $arr = $pg->fetchAll($result);
     var_dump($arr);
+
+    $result = $pg->query('SELECT * FROM weather;');
+    if (!$result) {
+        var_dump($pg->error);
+        return;
+    }
+    $arr = $pg->fetchAll($result);
+    var_dump($arr);
 });
 
 Event::wait();
