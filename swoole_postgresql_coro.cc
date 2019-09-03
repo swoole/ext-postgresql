@@ -171,7 +171,7 @@ void swoole_postgresql_init(int module_number)
     SW_SET_CLASS_CLONEABLE(swoole_postgresql_coro, sw_zend_class_clone_deny);
     SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_postgresql_coro, sw_zend_class_unset_property_deny);
     le_result = zend_register_list_destructors_ex(_free_result, NULL, "pgsql result", module_number);
-    zend_declare_property_null(swoole_postgresql_coro_ce, "error", 5, ZEND_ACC_PUBLIC);
+    zend_declare_property_null(swoole_postgresql_coro_ce, ZEND_STRL("error"), ZEND_ACC_PUBLIC);
 
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_ASSOC", PGSQL_ASSOC);
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_NUM", PGSQL_NUM);
@@ -189,15 +189,35 @@ static PHP_METHOD(swoole_postgresql_coro, __construct)
 static PHP_METHOD(swoole_postgresql_coro, connect)
 {
     zval *conninfo;
-    PGconn * pgsql;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_ZVAL(conninfo)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pgsql = PQconnectStart(Z_STRVAL_P(conninfo));
-    int fd =  PQsocket(pgsql);
+    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
+    if (object->conn)
+    {
+        RETURN_FALSE;
+    }
 
+    zend::string dsn(conninfo);
+    char *p = dsn.val();
+    for (size_t i = 0; i < dsn.len(); i++)
+    {
+        if (*p == ';')
+        {
+            *p = ' ';
+        }
+        p++;
+    }
+
+    PGconn *pgsql = PQconnectStart(dsn.val());
+    if (!pgsql)
+    {
+        RETURN_FALSE;
+    }
+
+    int fd = PQsocket(pgsql);
     if (sw_unlikely(fd < 0))
     {
         RETURN_FALSE;
@@ -218,16 +238,15 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
         RETURN_FALSE;
     }
 
-    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
     object->fd = fd;
     object->conn = pgsql;
     object->timeout = SW_PGSQL_CONNECT_TIMEOUT;
     object->status = CONNECTION_STARTED;
+    object->connected = false;
     
-
     PQsetnonblocking(pgsql , 1);
 
-    if (pgsql==NULL || PQstatus(pgsql)==CONNECTION_BAD)
+    if (pgsql == NULL || PQstatus(pgsql) == CONNECTION_BAD)
     {
         swWarn("Unable to connect to PostgreSQL server: [%s]", PQhost(pgsql));
         if (pgsql)
@@ -236,6 +255,9 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
         }
         RETURN_FALSE;
     }
+
+    swSocket *_socket = swReactor_get(SwooleTG.reactor, fd);
+    _socket->object = object;
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
     if (!context)
@@ -283,6 +305,7 @@ static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode)
 
     default:
         feedback = " time out..";
+        break;
     }
 
     err_msg = PQerrorMessage(object->conn);
@@ -290,7 +313,8 @@ static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode)
     if (pgsql==NULL || PQstatus(pgsql) == CONNECTION_STARTED)
     {
         swWarn(" [%s, %s] ", feedback, err_msg);
-    } else if (PQstatus(pgsql) == CONNECTION_MADE)
+    }
+    else if (PQstatus(pgsql) == CONNECTION_MADE)
     {
         PQfinish(pgsql);
     }
@@ -304,82 +328,61 @@ static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode)
     zval_ptr_dtor(result);
 }
 
-static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event)
+static void connect_callback(pg_object *object, swReactor *reactor, swEvent *event)
 {
+    PGconn *conn = object->conn;
+    ConnStatusType status = PQstatus(conn);
+    int events;
     char *err_msg;
-    if (event->socket->object)
-    {
-        return swReactor_onWrite(SwooleTG.reactor, event);
-    }
 
-    socklen_t len = sizeof(SwooleG.error);
-    if (getsockopt(event->fd, SOL_SOCKET, SO_ERROR, &SwooleG.error, &len) < 0)
-    {
-        swSysWarn("getsockopt(%d) failed", event->fd);
-        return SW_ERR;
-    }
+    swoole_event_del(event->fd);
 
-    pg_object *object = (pg_object *) event->socket->object;
+    if (status != CONNECTION_OK)
+    {
+        PostgresPollingStatusType flag = PQconnectPoll(conn);
+        switch (flag)
+        {
+        case PGRES_POLLING_READING:
+            events = SW_EVENT_READ;
+            break;
+        case PGRES_POLLING_WRITING:
+            events = SW_EVENT_WRITE;
+            break;
+        case PGRES_POLLING_OK:
+            object->connected = true;
+            events = 0;
+            break;
+        case PGRES_POLLING_FAILED:
+            events = 0;
+            err_msg = PQerrorMessage(conn);
+            zend_update_property_string(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"), err_msg);
+            break;
+        default:
+            swWarn("PQconnectPoll unexpected status");
+            break;
+        }
+
+        if (events)
+        {
+            swoole_event_add(event->fd, events, PHP_SWOOLE_FD_POSTGRESQL);
+            return;
+        }
+    }
 
     if (object->timer)
     {
         swoole_timer_del(object->timer);
         object->timer = NULL;
     }
-
-    uint8_t success = 1;
-    // wait the connection ok
-    ConnStatusType status =  PQstatus(object->conn);
-    if(status != CONNECTION_OK){
-        success = 0;
-        PostgresPollingStatusType flag = PGRES_POLLING_WRITING;
-        for (;;)
-        {
-            switch (flag)
-            {
-                case PGRES_POLLING_OK:
-                    break;
-                case PGRES_POLLING_READING:
-                    break;
-                case PGRES_POLLING_WRITING:
-                    break;
-                case PGRES_POLLING_FAILED:
-                    err_msg = PQerrorMessage(object->conn);
-                    swWarn("error:[%s]",err_msg);
-                    break;
-                default:
-                    break;
-            }
-
-            flag = PQconnectPoll(object->conn);
-            if(flag == PGRES_POLLING_OK )
-            {
-                success = 1;
-                break;
-            }
-            if(flag == PGRES_POLLING_FAILED )
-            {
-                err_msg = PQerrorMessage(object->conn);
-                swWarn("error:[%s] please cofirm that the connection configuration is correct \n",err_msg);
-                zend_update_property_string(swoole_postgresql_coro_ce, object->object, "error", 5, err_msg);
-                break;
-            }
-        }
-
-    }
-    //listen read event
-    SwooleTG.reactor->set(SwooleTG.reactor, event->fd, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ);
-    //connected
-    event->socket->object = object;
-
     php_coro_context *context = (php_coro_context *) swoole_get_property(object->object, 0);
 
     zval *retval = NULL;
     zval return_value;
-    ZVAL_BOOL(&return_value, success);
-    if (success == 1)
+    ZVAL_BOOL(&return_value, object->connected);
+
+    if (object->connected == 1)
     {
-        zend_update_property_null(swoole_postgresql_coro_ce, object->object, "error", 5);
+        zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
     }
 
     int ret = PHPCoroutine::resume_m(context, &return_value, retval);
@@ -387,12 +390,31 @@ static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event)
     {
         zval_ptr_dtor(retval);
     }
+}
+
+static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event)
+{
+    pg_object *object = (pg_object *) event->socket->object;
+    if (object->connected)
+    {
+        return swReactor_onWrite(SwooleTG.reactor, event);
+    }
+    else
+    {
+        connect_callback(object, reactor, event);
+    }
     return SW_OK;
 }
 
 static int swoole_pgsql_coro_onRead(swReactor *reactor, swEvent *event)
 {
     pg_object *object = (pg_object *)(event->socket->object);
+
+    if (!object->connected)
+    {
+        connect_callback(object, reactor, event);
+        return SW_OK;
+    }
 
     if (object->timer)
     {
@@ -503,8 +525,6 @@ static int query_result_parse(pg_object *object)
     case PGRES_NONFATAL_ERROR:
     case PGRES_FATAL_ERROR:
         err_msg = PQerrorMessage(object->conn);
-        swWarn("Query failed: [%s]", err_msg);
-
         PQclear(pgsql_result);
         ZVAL_FALSE(&return_value);
         zend_update_property_string(swoole_postgresql_coro_ce, object->object, "error", 5, err_msg);
@@ -529,13 +549,10 @@ static int query_result_parse(pg_object *object)
             zval_ptr_dtor(retval);
         }
         PQclear(pgsql_result);
-
         if (error != 0)
         {
-            php_swoole_fatal_error(E_WARNING, "swoole_event->onError[1]: socket error. Error: %s [%d]", strerror(error),
-                    error);
+            php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
         }
-
         break;
     }
     (void) res;
@@ -590,16 +607,17 @@ static PHP_METHOD(swoole_postgresql_coro, query)
         PQclear(pgsql_result);
     }
 
-    int ret  = PQsendQuery(pgsql, Z_STRVAL_P(query));
-    if(ret == 0)
+    int ret = PQsendQuery(pgsql, Z_STRVAL_P(query));
+    if (ret == 0)
     {
         char * err_msg = PQerrorMessage(pgsql);
-        swWarn("error:[%s]",err_msg);
-
+        swWarn("error:[%s]", err_msg);
     }
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
     context->coro_params = *ZEND_THIS;
+
+    swoole_event_add(object->fd, SW_EVENT_READ, PHP_SWOOLE_FD_POSTGRESQL);
 
     //TODO:  add the timeout
     /*
@@ -688,10 +706,10 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
     pgsql = object->conn;
     object->object = ZEND_THIS;
 
-
     is_non_blocking = PQisnonblocking(pgsql);
 
-    if (is_non_blocking == 0 && PQsetnonblocking(pgsql, 1) == -1) {
+    if (is_non_blocking == 0 && PQsetnonblocking(pgsql, 1) == -1)
+    {
         php_swoole_fatal_error(E_NOTICE, "Cannot set connection to nonblocking mode");
         RETURN_FALSE;
     }
@@ -702,44 +720,54 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
     }
 
     num_params = zend_hash_num_elements(Z_ARRVAL_P(pv_param_arr));
-    if (num_params > 0) {
+    if (num_params > 0)
+    {
         int i = 0;
         params = (char **)safe_emalloc(sizeof(char *), num_params, 0);
 
         ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(pv_param_arr), tmp) {
-
-            if (Z_TYPE_P(tmp) == IS_NULL) {
+            if (Z_TYPE_P(tmp) == IS_NULL)
+            {
                 params[i] = NULL;
-            } else {
+            }
+            else
+            {
                 zval tmp_val;
                 ZVAL_COPY(&tmp_val, tmp);
                 convert_to_string(&tmp_val);
-                if (Z_TYPE(tmp_val) != IS_STRING) {
-                    php_swoole_fatal_error(E_WARNING,"Error converting parameter");
+                if (Z_TYPE(tmp_val) != IS_STRING)
+                {
+                    php_swoole_fatal_error(E_WARNING, "Error converting parameter");
                     zval_ptr_dtor(&tmp_val);
                     _php_pgsql_free_params(params, num_params);
-                    RETURN_FALSE;
+                    RETURN_FALSE
+                    ;
                 }
                 params[i] = estrndup(Z_STRVAL(tmp_val), Z_STRLEN(tmp_val));
                 zval_ptr_dtor(&tmp_val);
             }
-
             i++;
         } ZEND_HASH_FOREACH_END();
     }
 
-    if (PQsendQueryPrepared(pgsql, Z_STRVAL_P(stmtname), num_params, (const char * const *)params, NULL, NULL, 0)) {
+    if (PQsendQueryPrepared(pgsql, Z_STRVAL_P(stmtname), num_params, (const char * const *) params, NULL, NULL, 0))
+    {
         _php_pgsql_free_params(params, num_params);
-    } else if (is_non_blocking) {
+    }
+    else if (is_non_blocking)
+    {
         _php_pgsql_free_params(params, num_params);
         RETURN_FALSE;
-    } else {
+    }
+    else
+    {
         /*
         if ((PGG(auto_reset_persistent) & 2) && PQstatus(pgsql) != CONNECTION_OK) {
             PQreset(pgsql);
         }
         */
-        if (!PQsendQueryPrepared(pgsql, Z_STRVAL_P(stmtname), num_params, (const char * const *)params, NULL, NULL, 0)) {
+        if (!PQsendQueryPrepared(pgsql, Z_STRVAL_P(stmtname), num_params, (const char * const *) params, NULL, NULL, 0))
+        {
             _php_pgsql_free_params(params, num_params);
             RETURN_FALSE;
         }
@@ -755,7 +783,6 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
             pg_object->timer = swTimer_add(&SwooleG.timer, (int) (pg_object->timeout * 1000), 0, sw_current_context, swoole_pgsql_coro_onTimeout);
         }*/
     PHPCoroutine::yield_m(return_value, context);
-
 }
 
 static void _php_pgsql_free_params(char **params, int num_params)
@@ -1275,33 +1302,48 @@ static PHP_METHOD(swoole_postgresql_coro, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    swoole_postgresql_coro_close(ZEND_THIS);
+    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
+    if (object)
+    {
+        if (object->conn)
+        {
+            swoole_postgresql_coro_close(ZEND_THIS);
+        }
+        efree(object);
+        swoole_set_object(ZEND_THIS, NULL);
+    }
 }
 
 static int swoole_postgresql_coro_close(zval *zobject)
 {
     pg_object *object = (pg_object *) swoole_get_object(zobject);
-    if (!object)
+    if (!object || !object->conn)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_postgresql_coro");
         return FAILURE;
     }
-    SwooleTG.reactor->del(SwooleTG.reactor, object->fd);
-    
-    swSocket *_socket = swReactor_get(SwooleTG.reactor, object->fd);
-    if (_socket->object)
+
+    if (SwooleTG.reactor)
     {
-        PGresult *res;
+        swSocket *_socket = swReactor_get(SwooleTG.reactor, object->fd);
+        if (!_socket->removed)
+        {
+            SwooleTG.reactor->del(SwooleTG.reactor, object->fd);
+        }
+        _socket->object = nullptr;
+    }
+
+    PGresult *res;
+    if (object->connected)
+    {
         while ((res = PQgetResult(object->conn)))
         {
             PQclear(res);
         }
         PQfinish(object->conn);
-        _socket->object = NULL;
+        object->conn = nullptr;
+        object->connected = false;
     }
-
-    efree(object);
-    swoole_set_object(zobject, NULL);
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(zobject, 0);
     if (context)

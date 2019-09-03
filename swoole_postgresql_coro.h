@@ -20,23 +20,23 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
-#include <libpq-fe.h>
+#include <postgresql/libpq-fe.h>
 
-typedef enum
+enum query_type
 {
-    NORMAL_QUERY,
-    META_DATA,
-    PREPARE
-} query_type;
+    NORMAL_QUERY, META_DATA, PREPARE
+};
 
-typedef struct _php_pgsql_object {
+typedef struct _php_pgsql_object
+{
     PGconn *conn;
     PGresult *result;
     zval *object;
     ConnStatusType status;
-    query_type request_type;
+    enum query_type request_type;
     int row;
     int fd;
+    bool connected;
     double timeout;
     swTimer_node *timer;
 } pg_object;

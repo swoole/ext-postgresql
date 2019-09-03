@@ -74,24 +74,9 @@ if test "$PHP_swoole_postgresql" != "no"; then
             PHP_ADD_INCLUDE("${PHP_LIBPQ_DIR}/include")
             PHP_ADD_LIBRARY_WITH_PATH(pq, "${PHP_LIBPQ_DIR}/${PHP_LIBDIR}")
             PGSQL_INCLUDE=$PHP_LIBPQ_DIR/include
-        else
-            PGSQL_SEARCH_PATHS="/usr /usr/local /usr/local/pgsql"
-            for i in $PGSQL_SEARCH_PATHS; do
-                for j in include include/pgsql include/postgres include/postgresql ""; do
-                    if test -r "$i/$j/libpq-fe.h"; then
-                        PGSQL_INC_BASE=$i
-                        PGSQL_INCLUDE=$i/$j
-                        AC_MSG_RESULT(libpq-fe.h found in PGSQL_INCLUDE)
-                        PHP_ADD_INCLUDE("${PGSQL_INCLUDE}")
-                    fi
-                done
-            done
         fi
         AC_DEFINE(SW_USE_POSTGRESQL, 1, [enable coroutine-postgresql support])
         PHP_ADD_LIBRARY(pq, 1, SWOOLE_POSTGRESQL_SHARED_LIBADD)
-    fi
-    if test -z "$PGSQL_INCLUDE"; then
-        AC_MSG_ERROR(Cannot find libpq-fe.h. Please confirm the libpq or specify correct PostgreSQL(libpq) installation path)
     fi
 
     CFLAGS="-Wall -pthread $CFLAGS"
