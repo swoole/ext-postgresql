@@ -225,14 +225,14 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
 
     php_swoole_check_reactor();
 
-    if (!swReactor_isset_handler(SwooleTG.reactor, PHP_SWOOLE_FD_POSTGRESQL))
+    if (!swReactor_isset_handler(sw_reactor(), PHP_SWOOLE_FD_POSTGRESQL))
     {
-        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
-        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
-        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
+        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
+        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
+        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
     }
 
-    if (SwooleTG.reactor->add(SwooleTG.reactor, fd, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE) < 0)
+    if (sw_reactor()->add(sw_reactor(), fd, PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE) < 0)
     {
         php_swoole_fatal_error(E_WARNING, "swoole_event_add failed");
         RETURN_FALSE;
@@ -256,7 +256,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
         RETURN_FALSE;
     }
 
-    swSocket *_socket = swReactor_get(SwooleTG.reactor, fd);
+    swSocket *_socket = swReactor_get(sw_reactor(), fd);
     _socket->object = object;
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
@@ -397,7 +397,7 @@ static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event)
     pg_object *object = (pg_object *) event->socket->object;
     if (object->connected)
     {
-        return swReactor_onWrite(SwooleTG.reactor, event);
+        return swReactor_onWrite(sw_reactor(), event);
     }
     else
     {
@@ -1323,12 +1323,12 @@ static int swoole_postgresql_coro_close(zval *zobject)
         return FAILURE;
     }
 
-    if (SwooleTG.reactor)
+    if (sw_reactor())
     {
-        swSocket *_socket = swReactor_get(SwooleTG.reactor, object->fd);
+        swSocket *_socket = swReactor_get(sw_reactor(), object->fd);
         if (!_socket->removed)
         {
-            SwooleTG.reactor->del(SwooleTG.reactor, object->fd);
+            sw_reactor()->del(sw_reactor(), object->fd);
         }
         _socket->object = nullptr;
     }
