@@ -332,7 +332,7 @@ static void connect_callback(pg_object *object, swReactor *reactor, swEvent *eve
 {
     PGconn *conn = object->conn;
     ConnStatusType status = PQstatus(conn);
-    int events;
+    int events = 0;
     char *err_msg;
 
     swoole_event_del(event->fd);
@@ -498,6 +498,7 @@ static int meta_data_result_parse(pg_object *object)
     {
         zval_ptr_dtor(retval);
     }
+    swoole_event_del(object->fd);
     zval_ptr_dtor(&return_value);
     return SW_OK;
 }
@@ -572,6 +573,7 @@ static  int prepare_result_parse(pg_object *object)
     /* Wait to finish sending buffer */
     //res = PQflush(object->conn);
     ZVAL_TRUE(&return_value);
+    swoole_event_del(object->fd);
     ret = PHPCoroutine::resume_m(context, &return_value, retval);
 
     if (ret == SW_CORO_END && retval)
@@ -583,6 +585,7 @@ static  int prepare_result_parse(pg_object *object)
     {
         php_swoole_fatal_error(E_WARNING, "swoole_event->onError[1]: socket error. Error: %s [%d]", strerror(error), error);
     }
+
 
     return SW_OK;
 }
@@ -681,6 +684,7 @@ static PHP_METHOD(swoole_postgresql_coro, prepare)
         {
             pg_object->timer = swTimer_add(&SwooleG.timer, (int) (pg_object->timeout * 1000), 0, sw_current_context, swoole_pgsql_coro_onTimeout);
         }*/
+    swoole_event_add(object->fd, SW_EVENT_READ, PHP_SWOOLE_FD_POSTGRESQL);
     PHPCoroutine::yield_m(return_value, context);
 }
 
@@ -782,6 +786,7 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
         {
             pg_object->timer = swTimer_add(&SwooleG.timer, (int) (pg_object->timeout * 1000), 0, sw_current_context, swoole_pgsql_coro_onTimeout);
         }*/
+    swoole_event_add(object->fd, SW_EVENT_READ, PHP_SWOOLE_FD_POSTGRESQL);
     PHPCoroutine::yield_m(return_value, context);
 }
 

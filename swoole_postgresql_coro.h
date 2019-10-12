@@ -20,7 +20,8 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
-#include <postgresql/libpq-fe.h>
+#include <libpq-fe.h>
+//#include <postgresql/libpq-fe.h>
 
 enum query_type
 {
