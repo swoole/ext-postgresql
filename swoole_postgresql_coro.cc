@@ -1029,11 +1029,13 @@ static PHP_METHOD(swoole_postgresql_coro, metaData)
 
     php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
     context->coro_params = *ZEND_THIS;
+    swoole_event_add(object->fd, SW_EVENT_READ, PHP_SWOOLE_FD_POSTGRESQL);
         /*
             if (pg_object->timeout > 0)
             {
                 pg_object->timer = swTimer_add(&SwooleG.timer, (int) (pg_object->timeout * 1000), 0, sw_current_context, swoole_pg_object_coro_onTimeout);
             }*/
+
     PHPCoroutine::yield_m(return_value, context);
 }
 
