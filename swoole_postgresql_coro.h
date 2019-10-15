@@ -20,8 +20,13 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
+#ifdef __APPLE__
 #include <libpq-fe.h>
-//#include <postgresql/libpq-fe.h>
+#endif
+
+#ifdef __linux__
+#include <postgresql/libpq-fe.h>
+#endif
 
 enum query_type
 {
