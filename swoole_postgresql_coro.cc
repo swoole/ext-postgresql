@@ -49,6 +49,67 @@ zend_module_entry swoole_postgresql_module_entry =
 ZEND_GET_MODULE(swoole_postgresql)
 #endif
 
+static zend_class_entry *swoole_postgresql_coro_ce;
+static zend_object_handlers swoole_postgresql_coro_handlers;
+static int le_result;
+
+typedef struct
+{
+    pg_object object;
+    php_coro_context context;
+    zend_object std;
+} postgresql_coro_t;
+
+static sw_inline postgresql_coro_t* swoole_postgresql_coro_fetch_object(zend_object *obj)
+{
+    return (postgresql_coro_t *) ((char *) obj - swoole_postgresql_coro_handlers.offset);
+}
+
+static sw_inline pg_object * swoole_postgresql_coro_get_object(zval *zobject)
+{
+    return swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->object;
+}
+
+static sw_inline void swoole_postgresql_coro_set_object(zval *zobject, pg_object *object)
+{
+    swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->object = object;
+}
+
+static sw_inline php_coro_context * swoole_postgresql_coro_get_context(zval *zobject)
+{
+    return swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->context;
+}
+
+static sw_inline void swoole_postgresql_coro_set_object(zval *zobject, php_coro_context *context)
+{
+    swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->context = context;
+}
+
+static int swoole_postgresql_coro_close(zval *zobject);
+
+static void swoole_postgresql_coro_free_object(zend_object *object)
+{
+    postgresql_coro_t *postgresql_coro = swoole_postgresql_coro_fetch_object(object);
+
+    if (postgresql_coro->object.conn)
+    {
+        zval zobject;
+        ZVAL_OBJ(&zobject, object);
+        swoole_postgresql_coro_close(&zobject);
+    }
+
+    zend_object_std_dtor(object);
+}
+
+static zend_object *swoole_postgresql_coro_create_object(zend_class_entry *ce)
+{
+    postgresql_coro_t *postgresql_coro = (postgresql_coro_t *) ecalloc(1, sizeof(postgresql_coro_t) + zend_object_properties_size(ce));
+    zend_object_std_init(&postgresql_coro->std, ce);
+    object_properties_init(&postgresql_coro->std, ce);
+    postgresql_coro->std.handlers = &swoole_postgresql_coro_handlers;
+    return &postgresql_coro->std;
+}
+
 static PHP_METHOD(swoole_postgresql_coro, __construct);
 static PHP_METHOD(swoole_postgresql_coro, __destruct);
 static PHP_METHOD(swoole_postgresql_coro, connect);
@@ -160,16 +221,14 @@ static const zend_function_entry swoole_postgresql_coro_methods[] =
     PHP_FE_END
 };
 
-static zend_class_entry *swoole_postgresql_coro_ce;
-static zend_object_handlers swoole_postgresql_coro_handlers;
-static int le_result;
-
 void swoole_postgresql_init(int module_number)
 {
     SW_INIT_CLASS_ENTRY(swoole_postgresql_coro, "Swoole\\Coroutine\\PostgreSQL", NULL, "Co\\PostgreSQL", swoole_postgresql_coro_methods);
     SW_SET_CLASS_SERIALIZABLE(swoole_postgresql_coro, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_postgresql_coro, sw_zend_class_clone_deny);
     SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_postgresql_coro, sw_zend_class_unset_property_deny);
+    SW_SET_CLASS_CUSTOM_OBJECT(swoole_postgresql_coro, swoole_postgresql_coro_create_object, swoole_postgresql_coro_free_object, postgresql_coro_t, std);
+
     le_result = zend_register_list_destructors_ex(_free_result, NULL, "pgsql result", module_number);
     zend_declare_property_null(swoole_postgresql_coro_ce, ZEND_STRL("error"), ZEND_ACC_PUBLIC);
 
@@ -178,13 +237,7 @@ void swoole_postgresql_init(int module_number)
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_BOTH", PGSQL_BOTH);
 }
 
-static PHP_METHOD(swoole_postgresql_coro, __construct)
-{
-    pg_object *pg = (pg_object *) emalloc(sizeof(pg_object));
-    bzero(pg, sizeof(pg_object));
-    pg->object = ZEND_THIS;
-    swoole_set_object(ZEND_THIS, pg);
-}
+static PHP_METHOD(swoole_postgresql_coro, __construct) { }
 
 static PHP_METHOD(swoole_postgresql_coro, connect)
 {
@@ -194,7 +247,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
         Z_PARAM_ZVAL(conninfo)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
+    pg_object *object = swoole_postgresql_coro_get_object(ZEND_THIS);
     if (object->conn)
     {
         RETURN_FALSE;
@@ -243,7 +296,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
     object->timeout = SW_PGSQL_CONNECT_TIMEOUT;
     object->status = CONNECTION_STARTED;
     object->connected = false;
-    
+
     PQsetnonblocking(pgsql , 1);
 
     if (pgsql == NULL || PQstatus(pgsql) == CONNECTION_BAD)
@@ -259,12 +312,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
     swSocket *_socket = swReactor_get(sw_reactor(), fd);
     _socket->object = object;
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
-    if (!context)
-    {
-        context = (php_coro_context *) emalloc(sizeof(php_coro_context));
-        swoole_set_property(ZEND_THIS, 0, context);
-    }
+    php_coro_context *context = swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
 
     if (object->timeout > 0)
@@ -289,7 +337,7 @@ static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode)
     zval _zobject = ctx->coro_params;
     zval *zobject = &_zobject;
 
-    pg_object *object = (pg_object *) swoole_get_object(zobject);
+    pg_object *object = swoole_postgresql_coro_get_object(zobject);
     object->timer = NULL;
     pgsql = object->conn;
 
@@ -374,7 +422,7 @@ static void connect_callback(pg_object *object, swReactor *reactor, swEvent *eve
         swoole_timer_del(object->timer);
         object->timer = NULL;
     }
-    php_coro_context *context = (php_coro_context *) swoole_get_property(object->object, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(object->object);
 
     zval *retval = NULL;
     zval return_value;
@@ -491,7 +539,7 @@ static int meta_data_result_parse(pg_object *object)
         add_assoc_zval(&return_value, name, &elem);
 
     }
-    php_coro_context *context = (php_coro_context *) swoole_get_property(object->object, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(object->object);
     zend_update_property_null(swoole_postgresql_coro_ce, object->object, "error", 5);
     int ret = PHPCoroutine::resume_m(context, &return_value, retval);
     if (ret == SW_CORO_ERR_END && retval)
@@ -513,7 +561,7 @@ static int query_result_parse(pg_object *object)
     int ret, res;
     zval *retval = NULL;
     zval return_value;
-    php_coro_context *context = (php_coro_context *) swoole_get_property(object->object, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(object->object);
 
     pgsql_result = PQgetResult(object->conn);
     status = PQresultStatus(pgsql_result);
@@ -568,7 +616,7 @@ static  int prepare_result_parse(pg_object *object)
     int ret;
     zval *retval = NULL;
     zval return_value;
-    php_coro_context *context = (php_coro_context *) swoole_get_property(object->object, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(object->object);
 
     /* Wait to finish sending buffer */
     //res = PQflush(object->conn);
@@ -600,7 +648,7 @@ static PHP_METHOD(swoole_postgresql_coro, query)
         Z_PARAM_ZVAL(query)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
+    pg_object *object = swoole_postgresql_coro_get_object(ZEND_THIS);
     object->request_type = NORMAL_QUERY;
     pgsql = object->conn;
     object->object = ZEND_THIS;
@@ -617,7 +665,7 @@ static PHP_METHOD(swoole_postgresql_coro, query)
         swWarn("error:[%s]", err_msg);
     }
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
 
     swoole_event_add(object->fd, SW_EVENT_READ, PHP_SWOOLE_FD_POSTGRESQL);
@@ -643,7 +691,7 @@ static PHP_METHOD(swoole_postgresql_coro, prepare)
         Z_PARAM_ZVAL(query)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
+    pg_object *object = swoole_postgresql_coro_get_object(ZEND_THIS);
     object->request_type = PREPARE;
     pgsql = object->conn;
     object->object = ZEND_THIS;
@@ -675,7 +723,7 @@ static PHP_METHOD(swoole_postgresql_coro, prepare)
     }
 
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
 
     //TODO:  add the timeout
@@ -705,7 +753,7 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
         Z_PARAM_ZVAL(pv_param_arr)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
+    pg_object *object = swoole_postgresql_coro_get_object(ZEND_THIS);
     object->request_type = NORMAL_QUERY;
     pgsql = object->conn;
     object->object = ZEND_THIS;
@@ -777,7 +825,7 @@ static PHP_METHOD(swoole_postgresql_coro, execute)
         }
     }
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
 
     //TODO:  add the timeout
@@ -941,7 +989,7 @@ static PHP_METHOD(swoole_postgresql_coro, metaData)
         Z_PARAM_STRING(table_name, table_name_len)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
+    pg_object *object = swoole_postgresql_coro_get_object(ZEND_THIS);
     object->request_type = META_DATA;
     pgsql = object->conn;
     object->object = ZEND_THIS;
@@ -1027,7 +1075,7 @@ static PHP_METHOD(swoole_postgresql_coro, metaData)
     }
     smart_str_free(&querystr);
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(ZEND_THIS, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
     swoole_event_add(object->fd, SW_EVENT_READ, PHP_SWOOLE_FD_POSTGRESQL);
         /*
@@ -1292,7 +1340,7 @@ static int swoole_pgsql_coro_onError(swReactor *reactor, swEvent *event)
 
     ZVAL_FALSE(result);
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(zobject, 0);
+    php_coro_context *context = swoole_postgresql_coro_get_context(zobject);
     zend_update_property_string(swoole_postgresql_coro_ce, zobject, "error", 5, "onerror");
     int ret = PHPCoroutine::resume_m(context, result, retval);
     zval_ptr_dtor(result);
@@ -1305,25 +1353,11 @@ static int swoole_pgsql_coro_onError(swReactor *reactor, swEvent *event)
     return SW_OK;
 }
 
-static PHP_METHOD(swoole_postgresql_coro, __destruct)
-{
-    SW_PREVENT_USER_DESTRUCT();
-
-    pg_object *object = (pg_object *) swoole_get_object(ZEND_THIS);
-    if (object)
-    {
-        if (object->conn)
-        {
-            swoole_postgresql_coro_close(ZEND_THIS);
-        }
-        efree(object);
-        swoole_set_object(ZEND_THIS, NULL);
-    }
-}
+static PHP_METHOD(swoole_postgresql_coro, __destruct) { }
 
 static int swoole_postgresql_coro_close(zval *zobject)
 {
-    pg_object *object = (pg_object *) swoole_get_object(zobject);
+    pg_object *object = swoole_postgresql_coro_get_object(zobject);
     if (!object || !object->conn)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_postgresql_coro");
@@ -1352,12 +1386,8 @@ static int swoole_postgresql_coro_close(zval *zobject)
         object->connected = false;
     }
 
-    php_coro_context *context = (php_coro_context *) swoole_get_property(zobject, 0);
-    if (context)
-    {
-        efree(context);
-        swoole_set_property(zobject, 0, NULL);
-    }
+    php_coro_context *context = swoole_postgresql_coro_get_context(zobject);
+    memset(context, 0, sizeof(*context));
 
     return SUCCESS;
 }
