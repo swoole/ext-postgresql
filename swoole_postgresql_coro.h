@@ -20,6 +20,12 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40413
+
+#if PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID != SWOOLE_VERSION_ID
+#error "Ext version does not match the Swoole version"
+#endif
+
 #ifdef __APPLE__
 #include <libpq-fe.h>
 #endif
