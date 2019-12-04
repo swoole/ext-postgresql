@@ -44,6 +44,7 @@ typedef struct _php_pgsql_object
     PGconn *conn;
     PGresult *result;
     zval *object;
+    zval _object;
     ConnStatusType status;
     enum query_type request_type;
     int row;

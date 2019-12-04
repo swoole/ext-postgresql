@@ -70,19 +70,9 @@ static sw_inline pg_object * php_swoole_postgresql_coro_get_object(zval *zobject
     return &php_swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->object;
 }
 
-static sw_inline void php_swoole_postgresql_coro_set_object(zval *zobject, pg_object *object)
-{
-    php_swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->object = *object;
-}
-
 static sw_inline php_coro_context * php_swoole_postgresql_coro_get_context(zval *zobject)
 {
     return &php_swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->context;
-}
-
-static sw_inline void php_swoole_postgresql_coro_set_object(zval *zobject, php_coro_context *context)
-{
-    php_swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->context = *context;
 }
 
 static int swoole_postgresql_coro_close(zval *zobject);
@@ -107,6 +97,13 @@ static zend_object *php_swoole_postgresql_coro_create_object(zend_class_entry *c
     zend_object_std_init(&postgresql_coro->std, ce);
     object_properties_init(&postgresql_coro->std, ce);
     postgresql_coro->std.handlers = &swoole_postgresql_coro_handlers;
+
+    do {
+        pg_object *object = &postgresql_coro->object;
+        object->object = &object->_object;
+        ZVAL_OBJ(object->object, &postgresql_coro->std);
+    } while (0);
+
     return &postgresql_coro->std;
 }
 
