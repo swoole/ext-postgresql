@@ -41,7 +41,7 @@ zend_module_entry swoole_postgresql_module_entry =
     NULL,
     NULL,
     PHP_MINFO(swoole_postgresql),
-    PHP_SWOOLE_VERSION,
+    PHP_SWOOLE_EXT_POSTGRESQL_VERSION,
     STANDARD_MODULE_PROPERTIES
 };
 
