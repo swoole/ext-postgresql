@@ -20,8 +20,8 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.4.13"
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40413
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.5.0"
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40500
 
 #if PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID != SWOOLE_VERSION_ID
 #error "Ext version does not match the Swoole version"
@@ -43,13 +43,13 @@ enum query_type
 typedef struct _php_pgsql_object
 {
     PGconn *conn;
+    swSocket *socket;
     PGresult *result;
     zval *object;
     zval _object;
     ConnStatusType status;
     enum query_type request_type;
     int row;
-    int fd;
     bool connected;
     double timeout;
     swTimer_node *timer;
