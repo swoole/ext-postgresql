@@ -21,9 +21,11 @@ PHP_ARG_ENABLE(swoole_postgresql, swoole_postgresql support,
 PHP_ARG_ENABLE(asan, whether to enable asan,
 [  --enable-asan             Enable asan], no, no)
 
-
 PHP_ARG_WITH(libpq_dir, dir of libpq,
 [  --with-libpq-dir[=DIR]      Include libpq support (requires libpq >= 9.5)], no, no)
+
+PHP_ARG_WITH(openssl_dir, dir of openssl,
+[  --with-openssl-dir[=DIR]    Include OpenSSL support (requires OpenSSL >= 0.9.6)], no, no)
 
 AC_MSG_CHECKING([if compiling with clang])
 AC_COMPILE_IFELSE([
@@ -77,6 +79,20 @@ if test "$PHP_swoole_postgresql" != "no"; then
         fi
         AC_DEFINE(SW_USE_POSTGRESQL, 1, [enable coroutine-postgresql support])
         PHP_ADD_LIBRARY(pq, 1, SWOOLE_POSTGRESQL_SHARED_LIBADD)
+    fi
+
+    if test "$PHP_OPENSSL" != "no" || test "$PHP_OPENSSL_DIR" != "no"; then
+        if test "$PHP_OPENSSL_DIR" != "no"; then
+            AC_DEFINE(HAVE_OPENSSL, 1, [have openssl])
+            PHP_ADD_INCLUDE("${PHP_OPENSSL_DIR}/include")
+            PHP_ADD_LIBRARY_WITH_PATH(ssl, "${PHP_OPENSSL_DIR}/${PHP_LIBDIR}")
+        else
+            AC_CHECK_LIB(ssl, SSL_connect, AC_DEFINE(HAVE_OPENSSL, 1, [have openssl]))
+        fi
+
+        AC_DEFINE(SW_USE_OPENSSL, 1, [enable openssl support])
+        PHP_ADD_LIBRARY(ssl, 1, SWOOLE_SHARED_LIBADD)
+        PHP_ADD_LIBRARY(crypto, 1, SWOOLE_SHARED_LIBADD)
     fi
 
     CFLAGS="-Wall -pthread $CFLAGS"

@@ -1427,6 +1427,13 @@ PHP_MINFO_FUNCTION(swoole_postgresql)
 #ifdef SW_LOG_TRACE_OPEN
     php_info_print_table_row(2, "trace_log", "enabled");
 #endif
+#ifdef SW_USE_OPENSSL
+#ifdef OPENSSL_VERSION_TEXT
+php_info_print_table_row(2, "openssl", OPENSSL_VERSION_TEXT);
+#else
+php_info_print_table_row(2, "openssl", "enabled");
+#endif
+#endif
 
     php_info_print_table_end();
 
