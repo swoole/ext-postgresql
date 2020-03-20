@@ -21,7 +21,6 @@ PHP_ARG_ENABLE(swoole_postgresql, swoole_postgresql support,
 PHP_ARG_ENABLE(asan, whether to enable asan,
 [  --enable-asan             Enable asan], no, no)
 
-
 PHP_ARG_WITH(libpq_dir, dir of libpq,
 [  --with-libpq-dir[=DIR]      Include libpq support (requires libpq >= 9.5)], no, no)
 
@@ -46,17 +45,6 @@ if test "$PHP_swoole_postgresql" != "no"; then
     PHP_SUBST(SWOOLE_POSTGRESQL_SHARED_LIBADD)
 
     AC_CHECK_LIB(pq, PQconnectdb, AC_DEFINE(HAVE_POSTGRESQL, 1, [have postgresql]))
-
-    AC_ARG_ENABLE(debug,
-        [  --enable-debug,         compile with debug symbols],
-        [PHP_DEBUG=$enableval],
-        [PHP_DEBUG=0]
-    )
-
-    if test "$PHP_DEBUG_LOG" != "no"; then
-        AC_DEFINE(SW_DEBUG, 1, [do we enable swoole debug])
-        PHP_DEBUG=1
-    fi
 
     if test "$PHP_ASAN" != "no"; then
         PHP_DEBUG=1
