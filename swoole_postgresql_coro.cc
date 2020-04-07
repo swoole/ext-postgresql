@@ -487,7 +487,6 @@ static int meta_data_result_parse(pg_object *object)
 {
 
     int i, num_rows;
-    zval elem;
     PGresult *pg_result;
     zend_bool extended=0;
     pg_result =PQgetResult(object->conn);
@@ -501,9 +500,12 @@ static int meta_data_result_parse(pg_object *object)
     zval  return_value;
     array_init(&return_value);
     zval * retval = NULL;
-    array_init(&elem);
+
     for (i = 0; i < num_rows; i++)
     {
+        zval elem;
+        array_init(&elem);
+
         object->result = pg_result;
         char *name;
         /* pg_attribute.attnum */
