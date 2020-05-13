@@ -20,8 +20,8 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.5.0"
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40500
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.5.1"
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40501
 
 #if SWOOLE_API_VERSION_ID != 0x202003a
 #error "Ext version does not match the Swoole version"
@@ -58,5 +58,16 @@ typedef struct _php_pgsql_object
 #define PGSQL_ASSOC           1<<0
 #define PGSQL_NUM             1<<1
 #define PGSQL_BOTH            (PGSQL_ASSOC|PGSQL_NUM)
+
+/* from postgresql/src/include/catalog/pg_type.h */
+#define BOOLOID     16
+#define BYTEAOID    17
+#define INT2OID     21
+#define INT4OID     23
+#define INT8OID     20
+#define TEXTOID     25
+#define OIDOID      26
+#define FLOAT4OID   700
+#define FLOAT8OID   701
 
 #endif
