@@ -15,6 +15,15 @@
  */
 
 #include "swoole_postgresql_coro.h"
+#include <zend_portability.h>
+
+#ifndef ZEND_INFINITY
+#define ZEND_INFINITY INFINITY
+#endif
+
+#ifndef ZEND_NAN
+#define ZEND_NAN NAN
+#endif
 
 using namespace swoole;
 
@@ -128,7 +137,6 @@ static void _free_result(zend_resource *rsrc);
 static int swoole_pgsql_coro_onRead(swReactor *reactor, swEvent *event);
 static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event);
 static int swoole_pgsql_coro_onError(swReactor *reactor, swEvent *event);
-int php_pgsql_result2array(PGresult *pg_result, zval *ret_array, long result_type);
 static int swoole_postgresql_coro_close(zval *zobject);
 static  int query_result_parse(pg_object *object);
 static  int prepare_result_parse(pg_object *object);
@@ -639,7 +647,7 @@ static PHP_METHOD(swoole_postgresql_coro, query)
     PGconn *pgsql;
     PGresult *pgsql_result;
 
-    ZEND_PARSE_PARAMETERS_START(1,1)
+    ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_ZVAL(query)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
@@ -663,14 +671,14 @@ static PHP_METHOD(swoole_postgresql_coro, query)
     php_coro_context *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
 
-    swoole_event_add(object->socket, SW_EVENT_READ);
-
-    //TODO:  add the timeout
-    /*
-        if (pg_object->timeout > 0)
-        {
-            pg_object->timer = swTimer_add(&SwooleG.timer, (int) (pg_object->timeout * 1000), 0, sw_current_context, swoole_pgsql_coro_onTimeout);
-        }*/
+    if (swoole_event_add(object->socket, SW_EVENT_READ) < 0)
+    {
+        RETURN_FALSE;
+    }
+    if (object->timeout > 0)
+    {
+        object->timer = swoole_timer_add((int) (object->timeout * 1000), 0, swoole_pgsql_coro_onTimeout, context);
+    }
     PHPCoroutine::yield_m(return_value, context);
 }
 
@@ -703,30 +711,36 @@ static PHP_METHOD(swoole_postgresql_coro, prepare)
         PQclear(pgsql_result);
     }
 
-    if (!PQsendPrepare(pgsql, Z_STRVAL_P(stmtname), Z_STRVAL_P(query), 0, NULL)) {
-        if (is_non_blocking) {
+    if (!PQsendPrepare(pgsql, Z_STRVAL_P(stmtname), Z_STRVAL_P(query), 0, NULL))
+    {
+        if (is_non_blocking)
+        {
             RETURN_FALSE;
-        } else {
+        }
+        else
+        {
             /*if ((PGG(auto_reset_persistent) & 2) && PQstatus(pgsql) != CONNECTION_OK) {
-                PQreset(pgsql);
-            }*/
-            if (!PQsendPrepare(pgsql, Z_STRVAL_P(stmtname), Z_STRVAL_P(query), 0, NULL)) {
+             PQreset(pgsql);
+             }*/
+            if (!PQsendPrepare(pgsql, Z_STRVAL_P(stmtname), Z_STRVAL_P(query), 0, NULL))
+            {
                 RETURN_FALSE;
             }
         }
     }
 
+    if (swoole_event_add(object->socket, SW_EVENT_READ) < 0)
+    {
+        RETURN_FALSE;
+    }
 
     php_coro_context *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
+    if (object->timeout > 0)
+    {
+        object->timer = swoole_timer_add((long) (object->timeout * 1000), 0, swoole_pgsql_coro_onTimeout, context);
+    }
 
-    //TODO:  add the timeout
-    /*
-        if (pg_object->timeout > 0)
-        {
-            pg_object->timer = swTimer_add(&SwooleG.timer, (int) (pg_object->timeout * 1000), 0, sw_current_context, swoole_pgsql_coro_onTimeout);
-        }*/
-    swoole_event_add(object->socket, SW_EVENT_READ);
     PHPCoroutine::yield_m(return_value, context);
 }
 
@@ -1135,12 +1149,10 @@ static PHP_METHOD(swoole_postgresql_coro, metaData)
     php_coro_context *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
     swoole_event_add(object->socket, SW_EVENT_READ);
-    /*
-    if (pg_object->timeout > 0)
+    if (object->timeout > 0)
     {
-        pg_object->timer = swTimer_add(&SwooleG.timer, (int) (pg_object->timeout * 1000), 0, sw_current_context, swoole_pg_object_coro_onTimeout);
-    }*/
-
+        object->timer = swoole_timer_add((long) (object->timeout * 1000), 0, swoole_pgsql_coro_onTimeout, context);
+    }
     PHPCoroutine::yield_m(return_value, context);
 }
 
@@ -1436,9 +1448,6 @@ static int swoole_postgresql_coro_close(zval *zobject)
  */
 PHP_MINIT_FUNCTION(swoole_postgresql)
 {
-//    ZEND_INIT_MODULE_GLOBALS(swoole, php_swoole_postgresql_init_globals, NULL);
-//    REGISTER_INI_ENTRIES();
-
     if (PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID != swoole_version_id())
     {
         php_swoole_fatal_error(
