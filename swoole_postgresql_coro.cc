@@ -914,6 +914,68 @@ static void _php_pgsql_free_params(char **params, int num_params)
     }
 }
 
+/* {{{ void php_pgsql_get_field_value */
+static inline void php_pgsql_get_field_value(zval *value, PGresult *pgsql_result, zend_long result_type, int row, int column)
+{
+	if (PQgetisnull(pgsql_result, row, column)) {
+		ZVAL_NULL(value);
+	} else {
+		char *element = PQgetvalue(pgsql_result, row, column);
+		if (element) {
+			const size_t element_len = PQgetlength(pgsql_result, row, column);
+			Oid pgsql_type = PQftype(pgsql_result, column);
+
+			switch (pgsql_type) {
+				case BOOLOID:
+					ZVAL_BOOL(value, *element == 't');
+					break;
+				case FLOAT4OID:
+				case FLOAT8OID:
+					if (element_len == sizeof("Infinity") - 1 && strcmp(element, "Infinity") == 0) {
+						ZVAL_DOUBLE(value, ZEND_INFINITY);
+					} else if (element_len == sizeof("-Infinity") - 1 && strcmp(element, "-Infinity") == 0) {
+						ZVAL_DOUBLE(value, -ZEND_INFINITY);
+					} else if (element_len == sizeof("NaN") - 1 && strcmp(element, "NaN") == 0) {
+						ZVAL_DOUBLE(value, ZEND_NAN);
+					} else {
+						ZVAL_DOUBLE(value, zend_strtod(element, NULL));
+					}
+					break;
+				case OIDOID:
+				case INT2OID:
+				case INT4OID:
+#if SIZEOF_ZEND_LONG >= 8
+				case INT8OID:
+#endif
+				{
+					zend_long long_value;
+					ZEND_ATOL(long_value, element);
+					ZVAL_LONG(value, long_value);
+					break;
+				}
+				case BYTEAOID:
+				{
+					size_t tmp_len;
+					char *tmp_ptr = (char *)PQunescapeBytea((unsigned char *)element, &tmp_len);
+					if (!tmp_ptr) {
+						/* PQunescapeBytea returned an error */
+						ZVAL_NULL(value);
+					} else {
+						ZVAL_STRINGL(value, tmp_ptr, tmp_len);
+						PQfreemem(tmp_ptr);
+					}
+					break;
+				}
+				default:
+					ZVAL_STRINGL(value, element, element_len);
+			}
+		} else {
+			ZVAL_NULL(value);
+		}
+	}
+}
+/* }}} */
+
 /* {{{ php_pgsql_result2array
  */
 int swoole_pgsql_result2array(PGresult *pg_result, zval *ret_array, long result_type)
@@ -925,48 +987,29 @@ int swoole_pgsql_result2array(PGresult *pg_result, zval *ret_array, long result_
     uint32_t i;
     assert(Z_TYPE_P(ret_array) == IS_ARRAY);
 
-    if ((pg_numrows = PQntuples(pg_result)) <= 0)
-    {
+    if ((pg_numrows = PQntuples(pg_result)) <= 0) {
         return FAILURE;
     }
-    for (pg_row = 0; pg_row < pg_numrows; pg_row++)
-    {
+    for (pg_row = 0; pg_row < pg_numrows; pg_row++) {
         array_init(&row);
-        for (i = 0, num_fields = PQnfields(pg_result); i < num_fields; i++)
-        {
-            field_name = PQfname(pg_result, i);
-            if (PQgetisnull(pg_result, pg_row, i))
-            {
-                if (result_type & PGSQL_ASSOC)
-                {
-                    add_assoc_null(&row, field_name);
-                }
-                if (result_type & PGSQL_NUM)
-                {
-                    add_next_index_null(&row);
-                }
+        for (i = 0, num_fields = PQnfields(pg_result); i < num_fields; i++) {
+            if (result_type & PGSQL_ASSOC) {
+                zval value;
+                php_pgsql_get_field_value(&value, pg_result, result_type, pg_row, i);
+                field_name = PQfname(pg_result, i);
+                add_assoc_zval(&row, field_name, &value);
             }
-            else
-            {
-                char *element = PQgetvalue(pg_result, pg_row, i);
-                if (element)
-                {
-                    const size_t element_len = strlen(element);
-                    if (result_type & PGSQL_ASSOC)
-                    {
-                        add_assoc_stringl(&row, field_name, element, element_len);
-                    }
-                    if (result_type & PGSQL_NUM)
-                    {
-                        add_next_index_stringl(&row, element, element_len);
-                    }
-                }
+            if (result_type & PGSQL_NUM) {
+                zval value;
+                php_pgsql_get_field_value(&value, pg_result, result_type, pg_row, i);
+                add_next_index_zval(&row, &value);
             }
         }
         add_index_zval(ret_array, pg_row, &row);
     }
     return SUCCESS;
 }
+/* }}} */
 
 static PHP_METHOD(swoole_postgresql_coro, fetchAll)
 {
@@ -1242,35 +1285,17 @@ static void php_pgsql_fetch_hash(INTERNAL_FUNCTION_PARAMETERS, zend_long result_
     array_init(return_value);
     for (i = 0, num_fields = PQnfields(pgsql_result); i < num_fields; i++)
     {
-        if (PQgetisnull(pgsql_result, pgsql_row, i)) {
-            if (result_type & PGSQL_NUM)
-            {
-                add_index_null(return_value, i);
-            }
-            if (result_type & PGSQL_ASSOC)
-            {
-                field_name = PQfname(pgsql_result, i);
-                add_assoc_null(return_value, field_name);
-            }
+        if (result_type & PGSQL_NUM) {
+            zval value;
+            php_pgsql_get_field_value(&value, pgsql_result, result_type, pgsql_row, i);
+            add_index_zval(return_value, i, &value);
         }
-        else
-        {
-            char *element = PQgetvalue(pgsql_result, pgsql_row, i);
-            if (element)
-            {
-                const size_t element_len = strlen(element);
 
-                if (result_type & PGSQL_NUM)
-                {
-                    add_index_stringl(return_value, i, element, element_len);
-                }
-
-                if (result_type & PGSQL_ASSOC)
-                {
-                    field_name = PQfname(pgsql_result, i);
-                    add_assoc_stringl(return_value, field_name, element, element_len);
-                }
-            }
+        if (result_type & PGSQL_ASSOC) {
+            zval value;
+            php_pgsql_get_field_value(&value, pgsql_result, result_type, pgsql_row, i);
+            field_name = PQfname(pgsql_result, i);
+            add_assoc_zval(return_value, field_name, &value);
         }
     }
 
