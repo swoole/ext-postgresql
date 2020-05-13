@@ -20,7 +20,7 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.4.16"
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.4.18"
 #define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40416
 
 #if PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID != SWOOLE_VERSION_ID
