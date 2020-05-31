@@ -1453,8 +1453,8 @@ PHP_MINIT_FUNCTION(swoole_postgresql)
         php_swoole_fatal_error(
             E_CORE_ERROR,
             "Ext version (%d) does not match the Swoole version (%d)",
-            swoole_version_id(),
-            PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID
+            PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID,
+            swoole_version_id()
         );
         return FAILURE;
     }
