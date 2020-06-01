@@ -1433,7 +1433,14 @@ static int swoole_postgresql_coro_close(zval *zobject)
         {
             PQclear(res);
         }
+        /**
+         * PQfinish will close fd
+         */
         PQfinish(object->conn);
+        /**
+         * fd marked -1, prevent double close
+         */
+        object->socket->fd = -1;
         object->conn = nullptr;
         object->connected = false;
     }
