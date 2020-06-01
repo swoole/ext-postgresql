@@ -24,6 +24,9 @@ PHP_ARG_ENABLE(asan, whether to enable asan,
 PHP_ARG_WITH(libpq_dir, dir of libpq,
 [  --with-libpq-dir[=DIR]      Include libpq support (requires libpq >= 9.5)], no, no)
 
+PHP_ARG_WITH(openssl_dir, dir of openssl,
+[  --with-openssl-dir[=DIR]    Include OpenSSL support (requires OpenSSL >= 0.9.6)], no, no)
+
 AC_MSG_CHECKING([if compiling with clang])
 AC_COMPILE_IFELSE([
     AC_LANG_PROGRAM([], [[
@@ -39,7 +42,7 @@ if test "$CLANG" = "yes"; then
     CFLAGS="$CFLAGS -std=gnu89"
 fi
 
-if test "$PHP_swoole_postgresql" != "no"; then
+if test "$PHP_SWOOLE_POSTGRESQL" != "no"; then
 
     PHP_ADD_LIBRARY(pthread)
     PHP_SUBST(SWOOLE_POSTGRESQL_SHARED_LIBADD)
@@ -65,6 +68,13 @@ if test "$PHP_swoole_postgresql" != "no"; then
         fi
         AC_DEFINE(SW_USE_POSTGRESQL, 1, [enable coroutine-postgresql support])
         PHP_ADD_LIBRARY(pq, 1, SWOOLE_POSTGRESQL_SHARED_LIBADD)
+    fi
+
+    if test "$PHP_OPENSSL" != "no" || test "$PHP_OPENSSL_DIR" != "no"; then
+        if test "$PHP_OPENSSL_DIR" != "no"; then
+            AC_DEFINE(SW_USE_OPENSSL, 1, [have openssl])
+            PHP_ADD_INCLUDE("${PHP_OPENSSL_DIR}/include")
+        fi
     fi
 
     CFLAGS="-Wall -pthread $CFLAGS"
