@@ -15,6 +15,7 @@
  */
 
 #include "swoole_postgresql_coro.h"
+#include "swoole_api.h"
 #include <zend_portability.h>
 
 #ifndef ZEND_INFINITY
@@ -258,7 +259,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
         RETURN_FALSE;
     }
 
-    zend::string dsn(conninfo);
+    zend::String dsn(conninfo);
     char *p = dsn.val();
     for (size_t i = 0; i < dsn.len(); i++)
     {
@@ -283,11 +284,11 @@ static PHP_METHOD(swoole_postgresql_coro, connect)
 
     php_swoole_check_reactor();
 
-    if (!swReactor_isset_handler(sw_reactor(), PHP_SWOOLE_FD_POSTGRESQL))
+    if (!swoole_event_isset_handler(PHP_SWOOLE_FD_POSTGRESQL))
     {
-        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
-        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
-        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
+        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
+        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
+        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
     }
 
     object->socket = swSocket_new(fd, (enum swFd_type) PHP_SWOOLE_FD_POSTGRESQL);

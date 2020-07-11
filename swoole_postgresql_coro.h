@@ -20,10 +20,10 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.5.1"
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40501
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.5.3"
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40503
 
-#if SWOOLE_API_VERSION_ID != 0x202003a
+#if SWOOLE_API_VERSION_ID < 0x202006a
 #error "Ext version does not match the Swoole version"
 #endif
 
@@ -32,7 +32,7 @@
 #endif
 
 #ifdef __linux__
-#include <libpq-fe.h>
+#include <postgresql/libpq-fe.h>
 #endif
 
 enum query_type
