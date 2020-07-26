@@ -600,7 +600,6 @@ static int query_result_parse(pg_object *object)
         {
             zval_ptr_dtor(retval);
         }
-        PQclear(pgsql_result);
         if (error != 0)
         {
             php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
