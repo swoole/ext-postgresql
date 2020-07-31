@@ -40,8 +40,7 @@ enum query_type
     NORMAL_QUERY, META_DATA, PREPARE
 };
 
-typedef struct _php_pgsql_object
-{
+struct pg_object {
     PGconn *conn;
     swSocket *socket;
     PGresult *result;
@@ -53,7 +52,7 @@ typedef struct _php_pgsql_object
     bool connected;
     double timeout;
     swTimer_node *timer;
-} pg_object;
+};
 
 #define PGSQL_ASSOC           1<<0
 #define PGSQL_NUM             1<<1
