@@ -23,7 +23,7 @@
 #define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.5.3"
 #define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40503
 
-#if SWOOLE_API_VERSION_ID < 0x202006a
+#if SWOOLE_API_VERSION_ID < 0x202008a
 #error "Ext version does not match the Swoole version"
 #endif
 
