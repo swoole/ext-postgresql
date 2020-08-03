@@ -30,6 +30,7 @@ using namespace swoole;
 
 PHP_MINIT_FUNCTION(swoole_postgresql);
 PHP_MINFO_FUNCTION(swoole_postgresql);
+
 void swoole_postgresql_init(int module_number);
 
 /* {{{ swoole_postgresql_deps
@@ -115,6 +116,7 @@ static zend_object *php_swoole_postgresql_coro_create_object(zend_class_entry *c
 static PHP_METHOD(swoole_postgresql_coro, __construct);
 static PHP_METHOD(swoole_postgresql_coro, __destruct);
 static PHP_METHOD(swoole_postgresql_coro, connect);
+static PHP_METHOD(swoole_postgresql_coro, escape);
 static PHP_METHOD(swoole_postgresql_coro, query);
 static PHP_METHOD(swoole_postgresql_coro, prepare);
 static PHP_METHOD(swoole_postgresql_coro, execute);
@@ -184,6 +186,10 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_pg_fetch_row, 0, 0, 1)
     ZEND_ARG_INFO(0, result_type)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_pg_escape, 0, 0, 1)
+    ZEND_ARG_INFO(0, string)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_pg_fetch_assoc, 0, 0, 1)
     ZEND_ARG_INFO(0, result)
     ZEND_ARG_INFO(0, row)
@@ -214,6 +220,7 @@ static const zend_function_entry swoole_postgresql_coro_methods[] =
     PHP_ME(swoole_postgresql_coro, affectedRows, arginfo_pg_affected_rows, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, numRows, arginfo_pg_num_rows, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, metaData, arginfo_pg_meta_data, ZEND_ACC_PUBLIC)
+    PHP_ME(swoole_postgresql_coro, escape, arginfo_pg_escape, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, fetchObject, arginfo_pg_fetch_object, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, fetchAssoc, arginfo_pg_fetch_assoc, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, fetchArray, arginfo_pg_fetch_array, ZEND_ACC_PUBLIC)
@@ -232,6 +239,7 @@ void swoole_postgresql_init(int module_number)
 
     le_result = zend_register_list_destructors_ex(_free_result, NULL, "pgsql result", module_number);
     zend_declare_property_null(swoole_postgresql_coro_ce, ZEND_STRL("error"), ZEND_ACC_PUBLIC);
+    zend_declare_property_long(swoole_postgresql_coro_ce, ZEND_STRL("errCode"), 0, ZEND_ACC_PUBLIC);
 
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_ASSOC", PGSQL_ASSOC);
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_NUM", PGSQL_NUM);
@@ -1433,6 +1441,36 @@ static int swoole_postgresql_coro_close(zval *zobject)
     memset(context, 0, sizeof(*context));
 
     return SUCCESS;
+}
+
+static PHP_METHOD(swoole_postgresql_coro, escape)
+{
+    char *str;
+    size_t l_str;
+    PGconn *pgsql;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(str, l_str)
+    ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+
+    pg_object *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    pgsql = object->conn;
+
+    zend_string *result = zend_string_alloc(l_str * 2, 0);
+    int error = 0;
+    size_t new_len = PQescapeStringConn(object->conn, result->val, str, l_str, &error);
+
+    if (new_len == 0 || error) {
+        zend_update_property_string(swoole_postgresql_coro_ce, ZEND_THIS, ZEND_STRL("error"), PQerrorMessage(pgsql));
+        zend_update_property_long(swoole_postgresql_coro_ce, ZEND_THIS, ZEND_STRL("errCode"), error);
+        zend_string_free(result);
+        RETURN_FALSE;
+    }
+    else {
+        result->val[new_len] = 0;
+        result->len = new_len;
+        RETURN_STR(result);
+    }
 }
 
 /* {{{ PHP_MINIT_FUNCTION
