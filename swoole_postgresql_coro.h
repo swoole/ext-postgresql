@@ -20,10 +20,10 @@
 #include "ext/swoole/php_swoole_cxx.h"
 #include "config.h"
 
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.5.3"
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40503
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.5.4"
+#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40504
 
-#if SWOOLE_API_VERSION_ID < 0x202008a
+#if SWOOLE_API_VERSION_ID < 0x202009a
 #error "Ext version does not match the Swoole version"
 #endif
 
