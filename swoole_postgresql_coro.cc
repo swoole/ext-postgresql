@@ -1087,11 +1087,11 @@ static void php_pgsql_fetch_hash(INTERNAL_FUNCTION_PARAMETERS, zend_long result_
         RETURN_FALSE;
     }
 
-    if ((pg_result = (pg_object *) zend_fetch_resource(Z_RES_P(result), "PostgreSQL result", le_result)) == NULL) {
+    if ((pgsql_result = (PGresult *) zend_fetch_resource(Z_RES_P(result), "PostgreSQL result", le_result)) == NULL) {
         RETURN_FALSE;
     }
 
-    pgsql_result = pg_result->result;
+    pg_result = php_swoole_postgresql_coro_get_object(ZEND_THIS);
 
     if (use_row) {
         if (row < 0 || row >= PQntuples(pgsql_result)) {
