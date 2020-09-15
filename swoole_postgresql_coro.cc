@@ -674,7 +674,7 @@ static int prepare_result_parse(pg_object *object) {
             PQclear(pgsql_result);
             ZVAL_FALSE(&return_value);
             swoole_event_del(object->socket);
-            zend_update_property_string(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
+            zend_update_property_string(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"), err_msg);
             ret = PHPCoroutine::resume_m(context, &return_value, retval);
             if (ret == Coroutine::ERR_END && retval) {
                 zval_ptr_dtor(retval);
