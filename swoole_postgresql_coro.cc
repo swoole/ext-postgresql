@@ -122,6 +122,7 @@ static PHP_METHOD(swoole_postgresql_coro, execute);
 static PHP_METHOD(swoole_postgresql_coro, fetchAll);
 static PHP_METHOD(swoole_postgresql_coro, affectedRows);
 static PHP_METHOD(swoole_postgresql_coro, numRows);
+static PHP_METHOD(swoole_postgresql_coro, fieldCount);
 static PHP_METHOD(swoole_postgresql_coro, metaData);
 static PHP_METHOD(swoole_postgresql_coro, fetchObject);
 static PHP_METHOD(swoole_postgresql_coro, fetchAssoc);
@@ -176,6 +177,10 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_pg_num_rows, 0, 0, 0)
     ZEND_ARG_INFO(0, result)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_pg_field_count, 0, 0, 0)
+    ZEND_ARG_INFO(0, result)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_pg_meta_data, 0, 0, 1)
     ZEND_ARG_INFO(0, table_name)
 ZEND_END_ARG_INFO()
@@ -219,6 +224,7 @@ static const zend_function_entry swoole_postgresql_coro_methods[] =
     PHP_ME(swoole_postgresql_coro, fetchAll, arginfo_pg_fetch_all, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, affectedRows, arginfo_pg_affected_rows, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, numRows, arginfo_pg_num_rows, ZEND_ACC_PUBLIC)
+    PHP_ME(swoole_postgresql_coro, fieldCount, arginfo_pg_field_count, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, metaData, arginfo_pg_meta_data, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, escape, arginfo_pg_escape, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, fetchObject, arginfo_pg_fetch_object, ZEND_ACC_PUBLIC)
@@ -1051,6 +1057,22 @@ static PHP_METHOD(swoole_postgresql_coro, numRows) {
     }
 
     RETVAL_LONG(PQntuples(pgsql_result));
+}
+
+//query's field count
+static PHP_METHOD(swoole_postgresql_coro, fieldCount) {
+    zval *result;
+    PGresult *pgsql_result;
+
+    ZEND_PARSE_PARAMETERS_START(1,1)
+    Z_PARAM_RESOURCE(result)
+    ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+
+    if ((pgsql_result = (PGresult *)zend_fetch_resource(Z_RES_P(result), "PostgreSQL result", le_result)) == NULL) {
+        RETURN_FALSE;
+    }
+
+    RETVAL_LONG(PQnfields(pgsql_result));
 }
 
 static PHP_METHOD(swoole_postgresql_coro, metaData) {
