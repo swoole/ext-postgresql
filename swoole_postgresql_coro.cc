@@ -595,8 +595,7 @@ static void set_error_diag(const pg_object *object, const PGresult *pgsql_result
     zend_update_property(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"), &result_diag);
 }
 
-static int query_result_parse(pg_object *object)
-{
+static int query_result_parse(pg_object *object) {
     PGresult *pgsql_result;
     ExecStatusType status;
 
