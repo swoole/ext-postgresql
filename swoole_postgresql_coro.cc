@@ -240,6 +240,8 @@ void swoole_postgresql_init(int module_number)
     le_result = zend_register_list_destructors_ex(_free_result, NULL, "pgsql result", module_number);
     zend_declare_property_null(swoole_postgresql_coro_ce, ZEND_STRL("error"), ZEND_ACC_PUBLIC);
     zend_declare_property_long(swoole_postgresql_coro_ce, ZEND_STRL("errCode"), 0, ZEND_ACC_PUBLIC);
+    zend_declare_property_long(swoole_postgresql_coro_ce, ZEND_STRL("resultStatus"), 0, ZEND_ACC_PUBLIC);
+    zend_declare_property_null(swoole_postgresql_coro_ce, ZEND_STRL("resultDiag"), ZEND_ACC_PUBLIC);
 
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_ASSOC", PGSQL_ASSOC);
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_NUM", PGSQL_NUM);
@@ -546,7 +548,8 @@ static int meta_data_result_parse(pg_object *object)
 
     }
     php_coro_context *context = php_swoole_postgresql_coro_get_context(object->object);
-    zend_update_property_null(swoole_postgresql_coro_ce, object->object, "error", 5);
+    zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
+    zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"));
     int ret = PHPCoroutine::resume_m(context, &return_value, retval);
     if (ret == SW_CORO_ERR_END && retval)
     {
@@ -555,6 +558,67 @@ static int meta_data_result_parse(pg_object *object)
     swoole_event_del(object->socket);
     zval_ptr_dtor(&return_value);
     return SW_OK;
+}
+
+static void set_error_diag(const pg_object *object, const PGresult *pgsql_result)
+{
+    const unsigned int error_codes[] = {
+        PG_DIAG_SEVERITY,
+        PG_DIAG_SQLSTATE,
+        PG_DIAG_MESSAGE_PRIMARY,
+        PG_DIAG_MESSAGE_DETAIL,
+        PG_DIAG_MESSAGE_HINT,
+        PG_DIAG_STATEMENT_POSITION,
+        PG_DIAG_INTERNAL_POSITION,
+        PG_DIAG_INTERNAL_QUERY,
+        PG_DIAG_CONTEXT,
+        PG_DIAG_SCHEMA_NAME,
+        PG_DIAG_TABLE_NAME,
+        PG_DIAG_COLUMN_NAME,
+        PG_DIAG_DATATYPE_NAME,
+        PG_DIAG_CONSTRAINT_NAME,
+        PG_DIAG_SOURCE_FILE,
+        PG_DIAG_SOURCE_LINE,
+        PG_DIAG_SOURCE_FUNCTION
+    };
+
+    const char* error_names[] = {
+        "severity",
+        "sqlstate",
+        "message_primary",
+        "message_detail",
+        "message_hint",
+        "statement_position",
+        "internal_position",
+        "internal_query",
+        "content",
+        "schema_name",
+        "table_name",
+        "column_name",
+        "datatype_name",
+        "constraint_name",
+        "source_file",
+        "source_line",
+        "source_function"
+    };
+
+    long unsigned int i;
+    char* error_result;
+
+    zval result_diag;
+    array_init_size(&result_diag, sizeof(error_codes) / sizeof(int));
+
+    for (i = 0; i < sizeof(error_codes) / sizeof(int); i++) {
+        error_result = PQresultErrorField(pgsql_result, error_codes[i]);
+
+        if (error_result != nullptr) {
+            add_assoc_string(&result_diag, error_names[i], error_result);
+        } else {
+            add_assoc_null(&result_diag, error_names[i]);
+        }
+    }
+
+    zend_update_property(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"), &result_diag);
 }
 
 static int query_result_parse(pg_object *object)
@@ -572,6 +636,8 @@ static int query_result_parse(pg_object *object)
     pgsql_result = PQgetResult(object->conn);
     status = PQresultStatus(pgsql_result);
 
+    zend_update_property_long(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultStatus"), status);
+
     switch (status)
     {
     case PGRES_EMPTY_QUERY:
@@ -579,10 +645,11 @@ static int query_result_parse(pg_object *object)
     case PGRES_NONFATAL_ERROR:
     case PGRES_FATAL_ERROR:
         err_msg = PQerrorMessage(object->conn);
+        set_error_diag(object, pgsql_result);
         PQclear(pgsql_result);
         ZVAL_FALSE(&return_value);
         swoole_event_del(object->socket);
-        zend_update_property_string(swoole_postgresql_coro_ce, object->object, "error", 5, err_msg);
+        zend_update_property_string(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"), err_msg);
         ret = PHPCoroutine::resume_m(context, &return_value, retval);
         if (ret == SW_CORO_ERR_END && retval)
         {
@@ -597,7 +664,8 @@ static int query_result_parse(pg_object *object)
         res = PQflush(object->conn);
         swoole_event_del(object->socket);
         ZVAL_RES(&return_value, zend_register_resource(pgsql_result, le_result));
-        zend_update_property_null(swoole_postgresql_coro_ce, object->object, "error", 5);
+        zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
+        zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"));
         ret = PHPCoroutine::resume_m(context, &return_value, retval);
         if (ret == SW_CORO_ERR_END && retval)
         {
@@ -616,28 +684,72 @@ static int query_result_parse(pg_object *object)
 
 static int prepare_result_parse(pg_object *object)
 {
+    PGresult *pgsql_result;
+    ExecStatusType status;
+
     int error = 0;
-    int ret;
+    char *err_msg;
+    int ret, res;
     zval *retval = NULL;
     zval return_value;
     php_coro_context *context = php_swoole_postgresql_coro_get_context(object->object);
 
-    /* Wait to finish sending buffer */
-    //res = PQflush(object->conn);
-    ZVAL_TRUE(&return_value);
-    swoole_event_del(object->socket);
-    ret = PHPCoroutine::resume_m(context, &return_value, retval);
+    pgsql_result = PQgetResult(object->conn);
+    status = PQresultStatus(pgsql_result);
 
-    if (ret == SW_CORO_END && retval)
+    zend_update_property_long(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultStatus"), status);
+
+    switch (status)
     {
-        zval_ptr_dtor(retval);
+        case PGRES_EMPTY_QUERY:
+        case PGRES_BAD_RESPONSE:
+        case PGRES_NONFATAL_ERROR:
+        case PGRES_FATAL_ERROR:
+            err_msg = PQerrorMessage(object->conn);
+            set_error_diag(object, pgsql_result);
+            PQclear(pgsql_result);
+            ZVAL_FALSE(&return_value);
+            swoole_event_del(object->socket);
+            zend_update_property_string(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
+            ret = PHPCoroutine::resume_m(context, &return_value, retval);
+            if (ret == SW_CORO_ERR_END && retval)
+            {
+                zval_ptr_dtor(retval);
+            }
+            break;
+        case PGRES_COMMAND_OK: /* successful command that did not return rows */
+            /* Wait to finish sending buffer */
+            //res = PQflush(object->conn);
+            swoole_event_del(object->socket);
+            ZVAL_TRUE(&return_value);
+            zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
+            zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"));
+            ret = PHPCoroutine::resume_m(context, &return_value, retval);
+            if (ret == SW_CORO_ERR_END && retval)
+            {
+                zval_ptr_dtor(retval);
+            }
+            if (error != 0)
+            {
+                php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
+            }
+            break;
+        default:
+            swoole_event_del(object->socket);
+            ZVAL_FALSE(&return_value);
+            zend_update_property_string(swoole_postgresql_coro_ce, object->object, "error", 5, "Bad result returned to prepare");
+            ret = PHPCoroutine::resume_m(context, &return_value, retval);
+            if (ret == SW_CORO_ERR_END && retval)
+            {
+                zval_ptr_dtor(retval);
+            }
+            if (error != 0)
+            {
+                php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
+            }
+            break;
     }
-
-    if (error != 0)
-    {
-        php_swoole_fatal_error(E_WARNING, "swoole_event->onError[1]: socket error. Error: %s [%d]", strerror(error), error);
-    }
-
+    (void) res;
 
     return SW_OK;
 }
