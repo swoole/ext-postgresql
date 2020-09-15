@@ -679,10 +679,14 @@ static int prepare_result_parse(pg_object *object) {
             if (ret == Coroutine::ERR_END && retval) {
                 zval_ptr_dtor(retval);
             }
+            if (error != 0) {
+                php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
+            }
             break;
         case PGRES_COMMAND_OK: /* successful command that did not return rows */
             /* Wait to finish sending buffer */
             //res = PQflush(object->conn);
+            PQclear(pgsql_result);
             swoole_event_del(object->socket);
             ZVAL_TRUE(&return_value);
             zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
@@ -696,16 +700,15 @@ static int prepare_result_parse(pg_object *object) {
             }
             break;
         default:
+            PQclear(pgsql_result);
             swoole_event_del(object->socket);
             ZVAL_FALSE(&return_value);
             zend_update_property_string(swoole_postgresql_coro_ce, object->object, "error", 5, "Bad result returned to prepare");
             ret = PHPCoroutine::resume_m(context, &return_value, retval);
-            if (ret == SW_CORO_ERR_END && retval)
-            {
+            if (ret == Coroutine::ERR_END && retval) {
                 zval_ptr_dtor(retval);
             }
-            if (error != 0)
-            {
+            if (error != 0) {
                 php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
             }
             break;
