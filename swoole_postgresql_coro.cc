@@ -116,6 +116,8 @@ static PHP_METHOD(swoole_postgresql_coro, __construct);
 static PHP_METHOD(swoole_postgresql_coro, __destruct);
 static PHP_METHOD(swoole_postgresql_coro, connect);
 static PHP_METHOD(swoole_postgresql_coro, escape);
+static PHP_METHOD(swoole_postgresql_coro, escapeLiteral);
+static PHP_METHOD(swoole_postgresql_coro, escapeIdentifier);
 static PHP_METHOD(swoole_postgresql_coro, query);
 static PHP_METHOD(swoole_postgresql_coro, prepare);
 static PHP_METHOD(swoole_postgresql_coro, execute);
@@ -227,6 +229,8 @@ static const zend_function_entry swoole_postgresql_coro_methods[] =
     PHP_ME(swoole_postgresql_coro, fieldCount, arginfo_pg_field_count, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, metaData, arginfo_pg_meta_data, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, escape, arginfo_pg_escape, ZEND_ACC_PUBLIC)
+    PHP_ME(swoole_postgresql_coro, escapeLiteral, arginfo_pg_escape, ZEND_ACC_PUBLIC)
+    PHP_ME(swoole_postgresql_coro, escapeIdentifier, arginfo_pg_escape, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, fetchObject, arginfo_pg_fetch_object, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, fetchAssoc, arginfo_pg_fetch_assoc, ZEND_ACC_PUBLIC)
     PHP_ME(swoole_postgresql_coro, fetchArray, arginfo_pg_fetch_array, ZEND_ACC_PUBLIC)
@@ -1460,6 +1464,52 @@ static PHP_METHOD(swoole_postgresql_coro, escape) {
         result->len = new_len;
         RETURN_STR(result);
     }
+}
+
+static PHP_METHOD(swoole_postgresql_coro, escapeLiteral) {
+    char *str, *tmp;
+    size_t l_str;
+    PGconn *pgsql;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+    Z_PARAM_STRING(str, l_str)
+    ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+
+    pg_object *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    pgsql = object->conn;
+
+    tmp = PQescapeLiteral(pgsql, str, l_str);
+    if (tmp == nullptr) {
+        zend_update_property_string(swoole_postgresql_coro_ce, ZEND_THIS, ZEND_STRL("error"), PQerrorMessage(pgsql));
+
+        RETURN_FALSE;
+    }
+
+    RETVAL_STRING(tmp);
+    PQfreemem(tmp);
+}
+
+static PHP_METHOD(swoole_postgresql_coro, escapeIdentifier) {
+    char *str, *tmp;
+    size_t l_str;
+    PGconn *pgsql;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+    Z_PARAM_STRING(str, l_str)
+    ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+
+    pg_object *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    pgsql = object->conn;
+
+    tmp = PQescapeIdentifier(pgsql, str, l_str);
+    if (tmp == nullptr) {
+        zend_update_property_string(swoole_postgresql_coro_ce, ZEND_THIS, ZEND_STRL("error"), PQerrorMessage(pgsql));
+
+        RETURN_FALSE;
+    }
+
+    RETVAL_STRING(tmp);
+    PQfreemem(tmp);
 }
 
 /* {{{ PHP_MINIT_FUNCTION
