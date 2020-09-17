@@ -51,7 +51,7 @@ struct pg_object {
     int row;
     bool connected;
     double timeout;
-    swTimer_node *timer;
+    swoole::TimerNode *timer;
 };
 
 #define PGSQL_ASSOC           1<<0

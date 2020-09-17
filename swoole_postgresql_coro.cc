@@ -139,7 +139,7 @@ static int swoole_postgresql_coro_close(zval *zobject);
 static int query_result_parse(pg_object *object);
 static int prepare_result_parse(pg_object *object);
 static int meta_data_result_parse(pg_object *object);
-static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode);
+static void swoole_pgsql_coro_onTimeout(swTimer *timer, swoole::TimerNode *tnode);
 static void _php_pgsql_free_params(char **params, int num_params);
 
 // clang-format off
@@ -334,7 +334,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
     PHPCoroutine::yield_m(return_value, context);
 }
 
-static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode) {
+static void swoole_pgsql_coro_onTimeout(swTimer *timer, swoole::TimerNode *tnode) {
     zval _result;
     zval *result = &_result;
     zval *retval = NULL;
