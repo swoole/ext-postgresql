@@ -8,7 +8,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: install-swoole
-      run: pecl install swoole
+      run: sudo apt install php7-dev &&& pecl install swoole
     - name: phpize
       run: phpize
     - name: build
