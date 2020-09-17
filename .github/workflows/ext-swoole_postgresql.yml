@@ -11,7 +11,7 @@ jobs:
       run: wget https://github.com/swoole/swoole-src/archive/master.zip &&
         unzip master.zip &&
         cd swoole-src-master &&
-        phpize &&
+        phpize && ./configure &&
         make -j 8 install
     - name: phpize
       run: phpize
