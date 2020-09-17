@@ -1,0 +1,14 @@
+name: ext-swoole
+
+on: [push, pull_request]
+
+jobs:
+  build-ubuntu-latest:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: phpize
+      run: phpize
+    - name: build
+      run: ./configure && make clean && make -j$(sysctl -n hw.ncpu)
+
