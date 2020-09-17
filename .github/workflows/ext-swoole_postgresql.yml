@@ -12,7 +12,11 @@ jobs:
         unzip master.zip &&
         cd swoole-src-master &&
         phpize && ./configure &&
-        make -j 8 install
+        sudo make -j 8 install &&
+        php --ini &&
+        php -v &&
+        echo "extension=swoole.so" >> /etc/php/7.2/cli/conf.d/30-swoole.ini &&
+        php -m
     - name: phpize
       run: phpize
     - name: build
