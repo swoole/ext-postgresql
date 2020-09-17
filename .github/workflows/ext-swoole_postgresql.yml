@@ -15,7 +15,7 @@ jobs:
         sudo make -j 8 install &&
         php --ini &&
         php -v &&
-        sudo echo "extension=swoole.so" >> /etc/php/7.4/cli/conf.d/30-swoole.ini &&
+        sudo sh -c "echo 'extension=swoole.so' >> /etc/php/7.4/cli/conf.d/30-swoole.ini" &&
         php -m
     - name: phpize
       run: phpize
