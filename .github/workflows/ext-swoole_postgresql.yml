@@ -1,4 +1,4 @@
-name: ext-swoole
+name: ext-swoole_postgresql
 
 on: [push, pull_request]
 
