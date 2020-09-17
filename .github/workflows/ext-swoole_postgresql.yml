@@ -9,7 +9,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: install-swoole
       run: wget https://github.com/swoole/swoole-src/archive/master.zip &&
-        tar xvf master.zip &&
+        unzip master.zip &&
         cd swoole-src-master &&
         phpize &&
         make -j 8 install
