@@ -8,16 +8,22 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: install-swoole
-      run: wget https://github.com/swoole/swoole-src/archive/master.zip &&
+      run: cd /tmp &&
+        wget https://github.com/swoole/swoole-src/archive/master.zip &&
         unzip master.zip &&
         cd swoole-src-master &&
         phpize && ./configure &&
-        sudo make -j 8 install &&
+        sudo make -j$(sysctl -n hw.ncpu) install &&
         php --ini &&
         php -v &&
         sudo sh -c "echo 'extension=swoole.so' >> /etc/php/7.4/cli/conf.d/30-swoole.ini" &&
-        php -m
+        php -m &&
+        cd -
     - name: phpize
       run: phpize
     - name: build
       run: ./configure && make clean && make -j$(sysctl -n hw.ncpu)
+    - name: composer
+      run: composer update
+    - name: tests
+      run: php vendor/bin/phpunit
