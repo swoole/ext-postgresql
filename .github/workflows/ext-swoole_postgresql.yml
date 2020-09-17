@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   build-ubuntu-latest:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-16.04
     steps:
     - uses: actions/checkout@v1
     - name: install-swoole
@@ -13,4 +13,3 @@ jobs:
       run: phpize
     - name: build
       run: ./configure && make clean && make -j$(sysctl -n hw.ncpu)
-
