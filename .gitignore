@@ -68,13 +68,6 @@ examples/c_module/.project
 /tmp-php.ini
 .settings/
 tests/.idea
-/tests/**/*.log
-/tests/**/*.sh
-/tests/**/*.diff
-/tests/**/*.out
-/tests/**/*.exp
-/tests/**/*.mem
-/tests/**/*.php
 /core-tests/server/*.log
 cmake-build-debug/
 *.cbp
@@ -96,3 +89,4 @@ cmake-build-debug/
 /examples/wrapper/server
 /examples/wrapper/cmake_install.cmake
 /vendor
+/.phpunit.result.cache
