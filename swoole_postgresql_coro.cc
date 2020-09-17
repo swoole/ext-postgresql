@@ -69,7 +69,7 @@ static int le_result;
 
 typedef struct {
     pg_object object;
-    php_coro_context context;
+    FutureTask context;
     zend_object std;
 } postgresql_coro_t;
 
@@ -81,7 +81,7 @@ static sw_inline pg_object *php_swoole_postgresql_coro_get_object(zval *zobject)
     return &php_swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->object;
 }
 
-static sw_inline php_coro_context *php_swoole_postgresql_coro_get_context(zval *zobject) {
+static sw_inline FutureTask *php_swoole_postgresql_coro_get_context(zval *zobject) {
     return &php_swoole_postgresql_coro_fetch_object(Z_OBJ_P(zobject))->context;
 }
 
@@ -325,7 +325,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
         RETURN_FALSE;
     }
 
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
 
     if (object->timeout > 0) {
@@ -339,7 +339,7 @@ static void swoole_pgsql_coro_onTimeout(swTimer *timer, swTimer_node *tnode) {
     zval *result = &_result;
     zval *retval = NULL;
     PGconn *pgsql;
-    php_coro_context *ctx = (php_coro_context *) tnode->data;
+    FutureTask *ctx = (FutureTask *) tnode->data;
     const char *feedback;
     char *err_msg;
 
@@ -423,7 +423,8 @@ static void connect_callback(pg_object *object, swReactor *reactor, swEvent *eve
         swoole_timer_del(object->timer);
         object->timer = NULL;
     }
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(object->object);
+
+    FutureTask *context = php_swoole_postgresql_coro_get_context(object->object);
 
     zval *retval = NULL;
     zval return_value;
@@ -523,7 +524,7 @@ static int meta_data_result_parse(pg_object *object) {
         name = PQgetvalue(pg_result, i, 0);
         add_assoc_zval(&return_value, name, &elem);
     }
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(object->object);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(object->object);
     zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
     zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"));
     int ret = PHPCoroutine::resume_m(context, &return_value, retval);
@@ -604,7 +605,7 @@ static int query_result_parse(pg_object *object) {
     int ret, res;
     zval *retval = NULL;
     zval return_value;
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(object->object);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(object->object);
 
     pgsql_result = PQgetResult(object->conn);
     status = PQresultStatus(pgsql_result);
@@ -661,7 +662,7 @@ static int prepare_result_parse(pg_object *object) {
     int ret, res;
     zval *retval = NULL;
     zval return_value;
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(object->object);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(object->object);
 
     pgsql_result = PQgetResult(object->conn);
     status = PQresultStatus(pgsql_result);
@@ -747,7 +748,7 @@ static PHP_METHOD(swoole_postgresql_coro, query) {
         swWarn("error:[%s]", err_msg);
     }
 
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
 
     if (swoole_event_add(object->socket, SW_EVENT_READ) < 0) {
@@ -803,7 +804,7 @@ static PHP_METHOD(swoole_postgresql_coro, prepare) {
         RETURN_FALSE;
     }
 
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
     if (object->timeout > 0) {
         object->timer = swoole_timer_add((long) (object->timeout * 1000), 0, swoole_pgsql_coro_onTimeout, context);
@@ -886,7 +887,7 @@ static PHP_METHOD(swoole_postgresql_coro, execute) {
         }
     }
 
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
 
     // TODO:  add the timeout
@@ -1166,7 +1167,7 @@ static PHP_METHOD(swoole_postgresql_coro, metaData) {
     }
     smart_str_free(&querystr);
 
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
     context->coro_params = *ZEND_THIS;
     swoole_event_add(object->socket, SW_EVENT_READ);
     if (object->timeout > 0) {
@@ -1381,7 +1382,7 @@ static int swoole_pgsql_coro_onError(swReactor *reactor, swEvent *event) {
 
     ZVAL_FALSE(result);
 
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(zobject);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(zobject);
     zend_update_property_string(swoole_postgresql_coro_ce, zobject, "error", 5, "onerror");
     int ret = PHPCoroutine::resume_m(context, result, retval);
     zval_ptr_dtor(result);
@@ -1428,7 +1429,7 @@ static int swoole_postgresql_coro_close(zval *zobject) {
         object->connected = false;
     }
 
-    php_coro_context *context = php_swoole_postgresql_coro_get_context(zobject);
+    FutureTask *context = php_swoole_postgresql_coro_get_context(zobject);
     memset(context, 0, sizeof(*context));
 
     return SUCCESS;

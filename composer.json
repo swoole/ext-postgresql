@@ -1,0 +1,7 @@
+{
+    "require": {
+        "phpunit/phpunit": "^9.3",
+        "ext-swoole": ">=4.5",
+        "ext-swoole_postgresql": ">=4.5"
+    }
+}
