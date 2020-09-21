@@ -35,23 +35,25 @@
 #include <postgresql/libpq-fe.h>
 #endif
 
-enum query_type
+enum pg_query_type
 {
     NORMAL_QUERY, META_DATA, PREPARE
 };
 
 struct pg_object {
     PGconn *conn;
-    swSocket *socket;
+    swoole::network::Socket *socket;
     PGresult *result;
     zval *object;
     zval _object;
     ConnStatusType status;
-    enum query_type request_type;
+    enum pg_query_type request_type;
     int row;
     bool connected;
     double timeout;
-    swTimer_node *timer;
+    bool ignore_notices;
+    bool log_notices;
+    swoole::TimerNode *timer;
 };
 
 #define PGSQL_ASSOC           1<<0
