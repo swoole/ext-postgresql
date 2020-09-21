@@ -5,6 +5,22 @@ on: [push, pull_request]
 jobs:
   build-ubuntu-latest:
     runs-on: ubuntu-16.04
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - uses: actions/checkout@v1
     - name: install swoole
@@ -25,8 +41,9 @@ jobs:
       run: phpize
     - name: build
       run: ./configure && make clean && make -j$(sysctl -n hw.ncpu)
-    - name: install postgresql
-      run: sudo apt install -y postgresql
+    - name: install swoole_postgresql
+      run: sudo make install &&
+        sudo sh -c "echo 'extension=swoole_postgresql.so' >> /etc/php/7.4/cli/conf.d/30-swoole_postgresql.ini"
     - name: composer
       run: composer update
     - name: tests
