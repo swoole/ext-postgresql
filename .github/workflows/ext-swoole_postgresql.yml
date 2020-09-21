@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   container-job:
     runs-on: ubuntu-latest
-    container: phpswoole/swoole:latest-dev
+    # container: phpswoole/swoole:latest-dev
     services:
       postgres:
         image: postgres
@@ -16,12 +16,23 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: install swoole
-      run: php -m &&
+      run: wget https://github.com/swoole/swoole-src/archive/master.zip &&
+        unzip master.zip &&
+        cd swoole-src-master &&
+        phpize && ./configure &&
+        make -j$(sysctl -n hw.ncpu) &&
+        sudo make install &&
+        php --ini &&
+        php -v &&
+        sudo sh -c "echo 'extension=swoole.so' >> /etc/php/7.4/cli/conf.d/30-swoole.ini" &&
+        php -m &&
+        cd - &&
+        rm -rf swoole-src-master &&
         pwd
     - name: phpize
       run: phpize
     - name: build
-      run: apt install -y libpq-dev &&
+      run: sudo apt install -y libpq-dev &&
         ./configure &&
         make clean &&
         make -j$(sysctl -n hw.ncpu)
