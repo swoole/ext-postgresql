@@ -256,10 +256,44 @@ void swoole_postgresql_init(int module_number) {
     zend_declare_property_long(swoole_postgresql_coro_ce, ZEND_STRL("errCode"), 0, ZEND_ACC_PUBLIC);
     zend_declare_property_long(swoole_postgresql_coro_ce, ZEND_STRL("resultStatus"), 0, ZEND_ACC_PUBLIC);
     zend_declare_property_null(swoole_postgresql_coro_ce, ZEND_STRL("resultDiag"), ZEND_ACC_PUBLIC);
+    zend_declare_property_null(swoole_postgresql_coro_ce, ZEND_STRL("notices"), ZEND_ACC_PUBLIC);
 
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_ASSOC", PGSQL_ASSOC);
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_NUM", PGSQL_NUM);
     SW_REGISTER_LONG_CONSTANT("SW_PGSQL_BOTH", PGSQL_BOTH);
+}
+
+static char * _php_pgsql_trim_message(const char *message, size_t *len) {
+    size_t i = strlen(message);
+    if (i > 2 && (message[i - 2] == '\r' || message[i - 2] == '\n') && message[i - 1] == '.') {
+        --i;
+    }
+    while (i > 1 && (message[i - 1] == '\r' || message[i - 1] == '\n')) {
+        --i;
+    }
+    if (len) {
+        *len = i;
+    }
+    return estrndup(message, i);
+}
+
+static void _php_pgsql_notice_handler(void *resource_id, const char *message) {
+    zval *notices;
+    zval tmp;
+    char *trimed_message;
+    size_t trimed_message_len;
+    pg_object *object = (pg_object *) resource_id;
+
+    if (!object->ignore_notices) {
+        notices = sw_zend_read_and_convert_property_array(swoole_postgresql_coro_ce, &object->_object, ZEND_STRL("notices"), 0);
+
+        trimed_message = _php_pgsql_trim_message(message, &trimed_message_len);
+        if (object->log_notices) {
+            php_error_docref(NULL, E_NOTICE, "%s", trimed_message);
+        }
+        add_next_index_stringl(notices, trimed_message, trimed_message_len);
+        efree(trimed_message);
+    }
 }
 
 static PHP_METHOD(swoole_postgresql_coro, __construct) {}
@@ -316,6 +350,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
     object->connected = false;
 
     PQsetnonblocking(pgsql, 1);
+    PQsetNoticeProcessor(pgsql, _php_pgsql_notice_handler, object);
 
     if (pgsql == NULL || PQstatus(pgsql) == CONNECTION_BAD) {
         swWarn("Unable to connect to PostgreSQL server: [%s]", PQhost(pgsql));
@@ -594,6 +629,7 @@ static void set_error_diag(const pg_object *object, const PGresult *pgsql_result
     }
 
     zend_update_property(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"), &result_diag);
+    zval_dtor(&result_diag);
 }
 
 static int query_result_parse(pg_object *object) {
@@ -745,7 +781,8 @@ static PHP_METHOD(swoole_postgresql_coro, query) {
     int ret = PQsendQuery(pgsql, Z_STRVAL_P(query));
     if (ret == 0) {
         char *err_msg = PQerrorMessage(pgsql);
-        swWarn("error:[%s]", err_msg);
+        zend_update_property_string(swoole_postgresql_coro_ce, ZEND_THIS, ZEND_STRL("error"), err_msg);
+        RETURN_FALSE;
     }
 
     FutureTask *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);

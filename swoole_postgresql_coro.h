@@ -35,7 +35,7 @@
 #include <postgresql/libpq-fe.h>
 #endif
 
-enum query_type
+enum pg_query_type
 {
     NORMAL_QUERY, META_DATA, PREPARE
 };
@@ -47,10 +47,12 @@ struct pg_object {
     zval *object;
     zval _object;
     ConnStatusType status;
-    enum query_type request_type;
+    enum pg_query_type request_type;
     int row;
     bool connected;
     double timeout;
+    bool ignore_notices;
+    bool log_notices;
     swoole::TimerNode *timer;
 };
 
