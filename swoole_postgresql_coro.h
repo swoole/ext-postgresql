@@ -42,7 +42,7 @@ enum query_type
 
 struct pg_object {
     PGconn *conn;
-    swSocket *socket;
+    swoole::network::Socket *socket;
     PGresult *result;
     zval *object;
     zval _object;

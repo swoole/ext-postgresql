@@ -334,7 +334,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
     PHPCoroutine::yield_m(return_value, context);
 }
 
-static void swoole_pgsql_coro_onTimeout(swTimer *timer, swoole::TimerNode *tnode) {
+static void swoole_pgsql_coro_onTimeout(Timer *timer, TimerNode *tnode) {
     zval _result;
     zval *result = &_result;
     zval *retval = NULL;
@@ -382,7 +382,7 @@ static void swoole_pgsql_coro_onTimeout(swTimer *timer, swoole::TimerNode *tnode
     zval_ptr_dtor(result);
 }
 
-static void connect_callback(pg_object *object, swReactor *reactor, swEvent *event) {
+static void connect_callback(pg_object *object, Reactor *reactor, Event *event) {
     PGconn *conn = object->conn;
     ConnStatusType status = PQstatus(conn);
     int events = 0;
