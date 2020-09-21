@@ -3,14 +3,13 @@ name: ext-swoole_postgresql
 on: [push, pull_request]
 
 jobs:
-  build-ubuntu-latest:
+  container-job:
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres
         env:
           POSTGRES_PASSWORD: postgres
-
     steps:
     - uses: actions/checkout@v1
     - name: install swoole
@@ -39,3 +38,6 @@ jobs:
     - name: tests
       run: pg_dump --host=127.0.0.1 --port=5432 --username=postgres --password --dbname=test> tests/testdb.sql &&
         php vendor/bin/phpunit
+      env:
+        POSTGRES_HOST: postgres
+        POSTGRES_PORT: 5432
