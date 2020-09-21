@@ -5,29 +5,30 @@ on: [push, pull_request]
 jobs:
   container-job:
     runs-on: ubuntu-latest
-    # container: phpswoole/swoole:latest-dev
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-            - 5432:5432
+     container: phpswoole/swoole:latest-dev
+#    services:
+#      postgres:
+#        image: postgres
+#        env:
+#          POSTGRES_PASSWORD: postgres
+#        ports:
+#            - 5432:5432
     steps:
     - uses: actions/checkout@v1
     - name: install swoole
-      run: wget https://github.com/swoole/swoole-src/archive/master.zip &&
-        unzip master.zip &&
-        cd swoole-src-master &&
-        phpize && ./configure &&
-        make -j$(sysctl -n hw.ncpu) &&
-        sudo make install &&
-        php --ini &&
-        php -v &&
-        sudo sh -c "echo 'extension=swoole.so' >> /etc/php/7.4/cli/conf.d/30-swoole.ini" &&
+      run:
+#        wget https://github.com/swoole/swoole-src/archive/master.zip &&
+#        unzip master.zip &&
+#        cd swoole-src-master &&
+#        phpize && ./configure &&
+#        make -j$(sysctl -n hw.ncpu) &&
+#        sudo make install &&
+#        php --ini &&
+#        php -v &&
+#        sudo sh -c "echo 'extension=swoole.so' >> /etc/php/7.4/cli/conf.d/30-swoole.ini" &&
         php -m &&
-        cd - &&
-        rm -rf swoole-src-master &&
+#        cd - &&
+#        rm -rf swoole-src-master &&
         pwd
     - name: phpize
       run: phpize
