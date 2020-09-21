@@ -12,7 +12,7 @@ Swoole\Coroutine\run(function () {
     $pg->connect(TEST_DB_URI);
     $retval = $pg->query('DROP TABLE IF EXISTS weather');
     if (!$retval) {
-        var_dump($retval, $pg->notices);
+        var_dump($retval, $pg->error, $pg->notices);
     }
 
     $retval = $pg->query('CREATE TABLE weather (
