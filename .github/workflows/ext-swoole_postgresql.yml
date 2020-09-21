@@ -36,7 +36,7 @@ jobs:
     - name: composer
       run: composer update
     - name: tests
-      run: pg_dump --host=127.0.0.1 --port=5432 --username=postgres --password --dbname=test> tests/testdb.sql &&
+      run: pg_dump --host=postgres --port=5432 --username=postgres --password --dbname=postgres> tests/testdb.sql &&
         php vendor/bin/phpunit
       env:
         POSTGRES_HOST: postgres
