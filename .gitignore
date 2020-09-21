@@ -90,3 +90,4 @@ cmake-build-debug/
 /examples/wrapper/cmake_install.cmake
 /vendor
 /.phpunit.result.cache
+composer.lock
