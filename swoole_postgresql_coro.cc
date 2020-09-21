@@ -1466,6 +1466,7 @@ static PHP_METHOD(swoole_postgresql_coro, escape) {
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(swoole_postgresql) {
+#if 0
     if (PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID != swoole_version_id()) {
         php_swoole_fatal_error(E_CORE_ERROR,
                                "Ext version (%d) does not match the Swoole version (%d)",
@@ -1473,7 +1474,7 @@ PHP_MINIT_FUNCTION(swoole_postgresql) {
                                swoole_version_id());
         return FAILURE;
     }
-
+#endif
     swoole_postgresql_init(module_number);
 
     return SUCCESS;

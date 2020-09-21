@@ -4,22 +4,12 @@ on: [push, pull_request]
 
 jobs:
   build-ubuntu-latest:
-    runs-on: ubuntu-16.04
-    # Service containers to run with `container-job`
+    runs-on: ubuntu-latest
     services:
-      # Label used to access the service container
       postgres:
-        # Docker Hub image
         image: postgres
-        # Provide the password for postgres
         env:
           POSTGRES_PASSWORD: postgres
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
     - uses: actions/checkout@v1
@@ -47,4 +37,5 @@ jobs:
     - name: composer
       run: composer update
     - name: tests
-      run: php vendor/bin/phpunit
+      run: pg_dump --host=127.0.0.1 --port=5432 --username=postgres --password --dbname=test> tests/testdb.sql &&
+        php vendor/bin/phpunit
