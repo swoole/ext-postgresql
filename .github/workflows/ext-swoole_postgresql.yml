@@ -21,7 +21,7 @@ jobs:
     - name: phpize
       run: phpize
     - name: build
-      run: sudo apt install -y libpq-dev &&
+      run: apt install -y libpq-dev &&
         ./configure &&
         make clean &&
         make -j$(sysctl -n hw.ncpu)
