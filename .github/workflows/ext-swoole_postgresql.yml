@@ -21,7 +21,10 @@ jobs:
     - name: phpize
       run: phpize
     - name: build
-      run: ./configure && make clean && make -j$(sysctl -n hw.ncpu)
+      run: sudo apt install -y libpq-dev &&
+        ./configure &&
+        make clean &&
+        make -j$(sysctl -n hw.ncpu)
     - name: install swoole_postgresql
       run: sudo make install &&
         sudo sh -c "echo 'extension=swoole_postgresql.so' >> /etc/php/7.4/cli/conf.d/30-swoole_postgresql.ini"
