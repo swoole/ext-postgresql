@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   container-job:
     runs-on: ubuntu-latest
-     container: phpswoole/swoole:latest-dev
+    container: phpswoole/swoole:latest-dev
     services:
       postgres:
         image: postgres
