@@ -103,6 +103,8 @@ static zend_object *php_swoole_postgresql_coro_create_object(zend_class_entry *c
     object_properties_init(&postgresql_coro->std, ce);
     postgresql_coro->std.handlers = &swoole_postgresql_coro_handlers;
 
+    Coroutine::get_current_safe();
+
     do {
         pg_object *object = &postgresql_coro->object;
         object->object = &object->_object;
@@ -283,7 +285,6 @@ static char * _php_pgsql_trim_message(const char *message, size_t *len) {
 
 static void _php_pgsql_notice_handler(void *resource_id, const char *message) {
     zval *notices;
-    zval tmp;
     char *trimed_message;
     size_t trimed_message_len;
     pg_object *object = (pg_object *) resource_id;
