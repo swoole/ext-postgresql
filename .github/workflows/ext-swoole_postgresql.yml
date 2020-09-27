@@ -15,24 +15,13 @@ jobs:
             - 5432:5432
     steps:
     - uses: actions/checkout@v1
-    - name: install swoole
-      run:
-        php -m &&
-        pwd
-    - name: phpize
-      run: phpize
     - name: build
-      run: ./configure &&
-        make clean &&
-        make -j$(sysctl -n hw.ncpu)
-    - name: install
-      run:
-        echo "make install" &&
-        sudo make install &&
-        echo "rm xdebug extension from php.ini" &&
-        sudo rm /etc/php/7.4/cli/conf.d/20-xdebug.ini &&
-        echo "add swoole_postgresql extension from php.ini" &&
-        sudo echo 'extension=swoole_postgresql.so' >> /etc/php/7.4/cli/conf.d/30-swoole_postgresql.ini
+      run: phpize &&
+        ./configure &&
+        make -j$(sysctl -n hw.ncpu) &&
+        make install &&
+        docker-php-ext-enable swoole_postgresql &&
+        php --ri swoole_postgresql
     - name: composer
       run: composer update
     - name: tests
