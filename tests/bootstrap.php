@@ -1,4 +1,9 @@
 <?php
+Swoole\Coroutine::set([
+    'log_level' => SWOOLE_LOG_INFO,
+    'trace_flags' => 0,
+]);
+
 if (getenv('POSTGRES_HOST')) {
     $host = getenv('POSTGRES_HOST');
     $port = getenv('POSTGRES_PORT');
