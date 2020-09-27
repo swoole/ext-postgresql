@@ -21,12 +21,11 @@ jobs:
         pwd
     - name: phpize
       run: phpize
-    - name: build
+    - name: build & install
       run: ./configure &&
         make clean &&
-        make -j$(sysctl -n hw.ncpu)
-    - name: install swoole_postgresql
-      run: echo "make install" &&
+        make -j$(sysctl -n hw.ncpu) &&
+        echo "make install" &&
         sudo make install &&
         echo "rm xdebug extension from php.ini" &&
         sudo rm /etc/php/7.4/cli/conf.d/20-xdebug.ini &&
