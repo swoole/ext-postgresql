@@ -377,7 +377,6 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
 static void swoole_pgsql_coro_onTimeout(Timer *timer, TimerNode *tnode) {
     zval _result;
     zval *result = &_result;
-    zval *retval = NULL;
     PGconn *pgsql;
     FutureTask *ctx = (FutureTask *) tnode->data;
     const char *feedback;
@@ -415,10 +414,7 @@ static void swoole_pgsql_coro_onTimeout(Timer *timer, TimerNode *tnode) {
     }
 
     zend_update_property_string(swoole_postgresql_coro_ce, zobject, "error", 5, "ontimeout");
-    int ret = PHPCoroutine::resume_m(ctx, result, retval);
-    if (ret == Coroutine::ERR_END && retval) {
-        zval_ptr_dtor(retval);
-    }
+    PHPCoroutine::resume_m(ctx, result);
     zval_ptr_dtor(result);
 }
 
@@ -466,24 +462,19 @@ static void connect_callback(pg_object *object, Reactor *reactor, Event *event) 
 
     FutureTask *context = php_swoole_postgresql_coro_get_context(object->object);
 
-    zval *retval = NULL;
     zval return_value;
     ZVAL_BOOL(&return_value, object->connected);
 
     if (object->connected == 1) {
         zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
     }
-
-    int ret = PHPCoroutine::resume_m(context, &return_value, retval);
-    if (ret == Coroutine::ERR_END && retval) {
-        zval_ptr_dtor(retval);
-    }
+    PHPCoroutine::resume_m(context, &return_value);
 }
 
 static int swoole_pgsql_coro_onWrite(swReactor *reactor, swEvent *event) {
     pg_object *object = (pg_object *) event->socket->object;
     if (object->connected) {
-        return swReactor_onWrite(sw_reactor(), event);
+        return sw_reactor()->default_write_handler(sw_reactor(), event);
     } else {
         connect_callback(object, reactor, event);
     }
@@ -532,7 +523,6 @@ static int meta_data_result_parse(pg_object *object) {
 
     zval return_value;
     array_init(&return_value);
-    zval *retval = NULL;
     array_init(&elem);
     for (i = 0; i < num_rows; i++) {
         object->result = pg_result;
@@ -567,10 +557,7 @@ static int meta_data_result_parse(pg_object *object) {
     FutureTask *context = php_swoole_postgresql_coro_get_context(object->object);
     zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
     zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"));
-    int ret = PHPCoroutine::resume_m(context, &return_value, retval);
-    if (ret == Coroutine::ERR_END && retval) {
-        zval_ptr_dtor(retval);
-    }
+    PHPCoroutine::resume_m(context, &return_value);
     swoole_event_del(object->socket);
     zval_ptr_dtor(&return_value);
     return SW_OK;
@@ -643,8 +630,7 @@ static int query_result_parse(pg_object *object) {
 
     int error = 0;
     char *err_msg;
-    int ret, res;
-    zval *retval = NULL;
+    int res;
     zval return_value;
     FutureTask *context = php_swoole_postgresql_coro_get_context(object->object);
 
@@ -665,10 +651,7 @@ static int query_result_parse(pg_object *object) {
         ZVAL_FALSE(&return_value);
         swoole_event_del(object->socket);
         zend_update_property_string(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"), err_msg);
-        ret = PHPCoroutine::resume_m(context, &return_value, retval);
-        if (ret == Coroutine::ERR_END && retval) {
-            zval_ptr_dtor(retval);
-        }
+        PHPCoroutine::resume_m(context, &return_value);
         break;
     case PGRES_COMMAND_OK: /* successful command that did not return rows */
     default:
@@ -680,13 +663,11 @@ static int query_result_parse(pg_object *object) {
         ZVAL_RES(&return_value, zend_register_resource(pgsql_result, le_result));
         zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
         zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"));
-        ret = PHPCoroutine::resume_m(context, &return_value, retval);
-        if (ret == Coroutine::ERR_END && retval) {
-            zval_ptr_dtor(retval);
-        }
+        PHPCoroutine::resume_m(context, &return_value);
         if (error != 0) {
             php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
         }
+        zval_ptr_dtor(&return_value);
         break;
     }
     (void) res;
@@ -700,8 +681,7 @@ static int prepare_result_parse(pg_object *object) {
 
     int error = 0;
     char *err_msg;
-    int ret, res;
-    zval *retval = NULL;
+    int res;
     zval return_value;
     FutureTask *context = php_swoole_postgresql_coro_get_context(object->object);
 
@@ -722,10 +702,7 @@ static int prepare_result_parse(pg_object *object) {
             ZVAL_FALSE(&return_value);
             swoole_event_del(object->socket);
             zend_update_property_string(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"), err_msg);
-            ret = PHPCoroutine::resume_m(context, &return_value, retval);
-            if (ret == Coroutine::ERR_END && retval) {
-                zval_ptr_dtor(retval);
-            }
+            PHPCoroutine::resume_m(context, &return_value);
             if (error != 0) {
                 php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
             }
@@ -738,10 +715,7 @@ static int prepare_result_parse(pg_object *object) {
             ZVAL_TRUE(&return_value);
             zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"));
             zend_update_property_null(swoole_postgresql_coro_ce, object->object, ZEND_STRL("resultDiag"));
-            ret = PHPCoroutine::resume_m(context, &return_value, retval);
-            if (ret == Coroutine::ERR_END && retval) {
-                zval_ptr_dtor(retval);
-            }
+            PHPCoroutine::resume_m(context, &return_value);
             if (error != 0) {
                 php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
             }
@@ -751,10 +725,7 @@ static int prepare_result_parse(pg_object *object) {
             swoole_event_del(object->socket);
             ZVAL_FALSE(&return_value);
             zend_update_property_string(swoole_postgresql_coro_ce, object->object, ZEND_STRL("error"), "Bad result returned to prepare");
-            ret = PHPCoroutine::resume_m(context, &return_value, retval);
-            if (ret == Coroutine::ERR_END && retval) {
-                zval_ptr_dtor(retval);
-            }
+            PHPCoroutine::resume_m(context, &return_value);
             if (error != 0) {
                 php_swoole_fatal_error(E_WARNING, "socket error. Error: %s [%d]", strerror(error), error);
             }
@@ -1419,19 +1390,14 @@ static int swoole_pgsql_coro_onError(swReactor *reactor, swEvent *event) {
     zval _result;
     zval *result = &_result;
     pg_object *object = (pg_object *) (event->socket->object);
-    zval *retval = NULL;
     zval *zobject = object->object;
 
     ZVAL_FALSE(result);
 
     FutureTask *context = php_swoole_postgresql_coro_get_context(zobject);
     zend_update_property_string(swoole_postgresql_coro_ce, zobject, "error", 5, "onerror");
-    int ret = PHPCoroutine::resume_m(context, result, retval);
+    PHPCoroutine::resume_m(context, result);
     zval_ptr_dtor(result);
-
-    if (ret == Coroutine::ERR_END && retval) {
-        zval_ptr_dtor(retval);
-    }
 
     return SW_OK;
 }
@@ -1448,7 +1414,7 @@ static int swoole_postgresql_coro_close(zval *zobject) {
     if (sw_reactor()) {
         swSocket *_socket = object->socket;
         if (!_socket->removed) {
-            sw_reactor()->del(sw_reactor(), _socket);
+            sw_reactor()->del(_socket);
         }
         _socket->object = nullptr;
         _socket->free();
