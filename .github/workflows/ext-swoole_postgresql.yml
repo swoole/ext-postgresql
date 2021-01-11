@@ -16,11 +16,14 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: phpize &&
-        ./configure &&
-        make -j$(sysctl -n hw.ncpu) &&
-        make install &&
-        docker-php-ext-enable swoole_postgresql &&
+      run: |
+        apt-get update
+        apt-get install -y libpq-dev
+        phpize
+        ./configure
+        make -j$(sysctl -n hw.ncpu)
+        make install
+        docker-php-ext-enable swoole_postgresql
         php --ri swoole_postgresql
     - name: composer
       run: composer update
