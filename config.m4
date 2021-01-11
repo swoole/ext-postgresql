@@ -15,6 +15,9 @@ dnl  +----------------------------------------------------------------------+
 dnl  | Author: Tianfeng Han  <mikan.tenny@gmail.com>                        |
 dnl  +----------------------------------------------------------------------+
 
+PHP_ARG_ENABLE(trace-log, enable trace log,
+[  --enable-trace-log        Enable swoole trace log], no, no)
+
 PHP_ARG_ENABLE(swoole_postgresql, swoole_postgresql support,
 [  --enable-swoole_postgresql           Enable swoole_postgresql support], [enable_swoole_postgresql="yes"])
 
