@@ -301,6 +301,17 @@ static void _php_pgsql_notice_handler(void *resource_id, const char *message) {
     }
 }
 
+static void swoole_pgsql_check_and_register(void) {
+    php_swoole_check_reactor();
+
+    if (!swoole_event_isset_handler(PHP_SWOOLE_FD_POSTGRESQL)) {
+        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
+        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
+        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
+    }
+
+}
+
 static PHP_METHOD(swoole_postgresql_coro, __construct) {}
 
 static PHP_METHOD(swoole_postgresql_coro, connect) {
@@ -334,6 +345,8 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
         RETURN_FALSE;
     }
 
+    swoole_pgsql_check_and_register();
+    /*
     php_swoole_check_reactor();
 
     if (!swoole_event_isset_handler(PHP_SWOOLE_FD_POSTGRESQL)) {
@@ -341,7 +354,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
         swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
         swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
     }
-
+    */
     object->socket = make_socket(fd, (enum swFd_type) PHP_SWOOLE_FD_POSTGRESQL);
     if (swoole_event_add(object->socket, SW_EVENT_WRITE) < 0) {
         php_swoole_fatal_error(E_WARNING, "swoole_event_add failed");
@@ -750,6 +763,8 @@ static PHP_METHOD(swoole_postgresql_coro, query) {
     pgsql = object->conn;
     object->object = ZEND_THIS;
 
+    swoole_pgsql_check_and_register();
+
     while ((pgsql_result = PQgetResult(pgsql))) {
         PQclear(pgsql_result);
     }
@@ -788,6 +803,8 @@ static PHP_METHOD(swoole_postgresql_coro, prepare) {
     object->request_type = PREPARE;
     pgsql = object->conn;
     object->object = ZEND_THIS;
+
+    swoole_pgsql_check_and_register();
 
     is_non_blocking = PQisnonblocking(pgsql);
 
@@ -844,6 +861,7 @@ static PHP_METHOD(swoole_postgresql_coro, execute) {
     object->request_type = NORMAL_QUERY;
     pgsql = object->conn;
     object->object = ZEND_THIS;
+    swoole_pgsql_check_and_register();
 
     is_non_blocking = PQisnonblocking(pgsql);
 
@@ -1108,6 +1126,7 @@ static PHP_METHOD(swoole_postgresql_coro, metaData) {
     object->request_type = META_DATA;
     pgsql = object->conn;
     object->object = ZEND_THIS;
+    swoole_pgsql_check_and_register();
 
     while ((pg_result = PQgetResult(pgsql))) {
         PQclear(pg_result);
