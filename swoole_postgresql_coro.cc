@@ -761,12 +761,19 @@ static PHP_METHOD(swoole_postgresql_coro, query) {
         RETURN_FALSE;
     }
 
-    while (PQflush(pgsql) == 1) {
+    int retval = 0;
+    while ((retval = PQflush(pgsql)) == 1) {
         if (System::wait_event(PQsocket(pgsql), SW_EVENT_WRITE, object->timeout) <= 0) {
             zend_update_property_string(swoole_postgresql_coro_ce, SW_Z8_OBJ_P(ZEND_THIS), ZEND_STRL("error"),
                                         swoole_strerror(swoole_get_last_error()));
             RETURN_FALSE;
         }
+    }
+
+    if (retval == -1) {
+        char *err_msg = PQerrorMessage(pgsql);
+        zend_update_property_string(swoole_postgresql_coro_ce, SW_Z8_OBJ_P(ZEND_THIS), ZEND_STRL("error"), err_msg);
+        RETURN_FALSE;
     }
 
     FutureTask *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
