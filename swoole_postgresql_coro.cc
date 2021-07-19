@@ -27,6 +27,7 @@
 #endif
 
 using namespace swoole;
+using swoole::coroutine::System;
 
 PHP_MINIT_FUNCTION(swoole_postgresql);
 PHP_MINFO_FUNCTION(swoole_postgresql);
@@ -754,11 +755,14 @@ static PHP_METHOD(swoole_postgresql_coro, query) {
         PQclear(pgsql_result);
     }
 
-    int ret = PQsendQuery(pgsql, Z_STRVAL_P(query));
-    if (ret == 0) {
+    if (PQsendQuery(pgsql, Z_STRVAL_P(query)) == 0) {
         char *err_msg = PQerrorMessage(pgsql);
         zend_update_property_string(swoole_postgresql_coro_ce, SW_Z8_OBJ_P(ZEND_THIS), ZEND_STRL("error"), err_msg);
         RETURN_FALSE;
+    }
+
+    while (PQflush(pgsql) == 1) {
+        System::wait_event(PQsocket(pgsql), SW_EVENT_WRITE, object->timeout);
     }
 
     FutureTask *context = php_swoole_postgresql_coro_get_context(ZEND_THIS);
