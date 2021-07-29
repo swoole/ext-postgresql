@@ -1055,8 +1055,8 @@ static inline void php_pgsql_get_field_value(
  */
 int swoole_pgsql_result2array(PGresult *pg_result, zval *ret_array, long result_type) {
     zval row;
-    char *field_name;
-    size_t num_fields;
+    const char *field_name;
+    size_t num_fields, unknown_columns;
     int pg_numrows, pg_row;
     uint32_t i;
     assert(Z_TYPE_P(ret_array) == IS_ARRAY);
@@ -1066,11 +1066,18 @@ int swoole_pgsql_result2array(PGresult *pg_result, zval *ret_array, long result_
     }
     for (pg_row = 0; pg_row < pg_numrows; pg_row++) {
         array_init(&row);
+        unknown_columns = 0;
         for (i = 0, num_fields = PQnfields(pg_result); i < num_fields; i++) {
             if (result_type & PGSQL_ASSOC) {
                 zval value;
                 php_pgsql_get_field_value(&value, pg_result, result_type, pg_row, i);
                 field_name = PQfname(pg_result, i);
+                if (0 == strcmp("?column?", field_name)) {
+                    if (unknown_columns > 0) {
+                        field_name = (std::string(field_name) + std::to_string(unknown_columns)).c_str();
+                    }
+                    ++unknown_columns;
+                }
                 add_assoc_zval(&row, field_name, &value);
             }
             if (result_type & PGSQL_NUM) {
