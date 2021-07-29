@@ -35,6 +35,18 @@ class PostgreSQLTest extends TestCase
         });
     }
 
+    public function testPrepare()
+    {
+        run(function () {
+            $pg = $this->getConn();
+            $prepare_result = $pg->prepare('key', "INSERT INTO weather(city, temp_lo, temp_hi, prcp, date) 
+                        VALUES ($1, $2, $3, $4, $5)  RETURNING id");
+            $this->assertNotFalse($prepare_result, (string) $pg->error);
+            $execute_result = $pg->execute('key', ['Beijing', rand(1000, 99999), 10, 0.75, '1993-11-23']);
+            $this->assertNotFalse($execute_result, (string) $pg->error);
+        });
+    }
+
     public function testQuery()
     {
         run(function () {
