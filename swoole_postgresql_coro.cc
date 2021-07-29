@@ -761,7 +761,7 @@ static bool swoole_pgsql_wait_write_ready(PGconn *pgsql, pg_object *object, zval
     };
 
     while ((retval = PQflush(pgsql)) == 1) {
-        if (!object->socket->isset_writable_event() && !swoole_event_add(object->socket, SW_EVENT_WRITE)) {
+        if (!object->socket->isset_writable_event() && swoole_event_add(object->socket, SW_EVENT_WRITE) == SW_ERR) {
             return false;
         }
         object->co->yield_ex(object->timeout);
