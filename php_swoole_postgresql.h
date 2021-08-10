@@ -11,6 +11,7 @@
   | license@swoole.com so we can mail you a copy immediately.            |
   +----------------------------------------------------------------------+
   | Author: Zhenyu Wu  <936321732@qq.com>                                |
+  |         Tianfeng Han <rango@swoole.com>                              |
   +----------------------------------------------------------------------+
  */
 #ifndef SWOOLE_POSTGRESQL_H_
@@ -20,10 +21,10 @@
 #include "ext/swoole/ext-src/php_swoole_cxx.h"
 #include "config.h"
 
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION     "4.7.0"
-#define PHP_SWOOLE_EXT_POSTGRESQL_VERSION_ID  40700
+#define PHP_SWOOLE_EXT_PLUS_VERSION     "4.7.0"
+#define PHP_SWOOLE_EXT_PLUS_VERSION_ID  40700
 
-#if SWOOLE_API_VERSION_ID < 0x202107a
+#if SWOOLE_API_VERSION_ID < 0x202108a
 #error "Ext version does not match the Swoole version"
 #endif
 
@@ -35,41 +36,6 @@
 #include <postgresql/libpq-fe.h>
 #endif
 
-enum pg_query_type
-{
-    NORMAL_QUERY, META_DATA, PREPARE
-};
-
-struct pg_object {
-    PGconn *conn;
-    swoole::network::Socket *socket;
-    swoole::Coroutine *co;
-    PGresult *result;
-    zval *object;
-    zval _object;
-    ConnStatusType status;
-    enum pg_query_type request_type;
-    int row;
-    bool connected;
-    double timeout;
-    bool ignore_notices;
-    bool log_notices;
-    swoole::TimerNode *timer;
-};
-
-#define PGSQL_ASSOC           1<<0
-#define PGSQL_NUM             1<<1
-#define PGSQL_BOTH            (PGSQL_ASSOC|PGSQL_NUM)
-
-/* from postgresql/src/include/catalog/pg_type.h */
-#define BOOLOID     16
-#define BYTEAOID    17
-#define INT2OID     21
-#define INT4OID     23
-#define INT8OID     20
-#define TEXTOID     25
-#define OIDOID      26
-#define FLOAT4OID   700
-#define FLOAT8OID   701
+#include <zend_portability.h>
 
 #endif

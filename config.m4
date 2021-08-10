@@ -82,7 +82,7 @@ if test "$PHP_SWOOLE_POSTGRESQL" != "no"; then
 
     PHP_ADD_LIBRARY(pthread, 1, SWOOLE_POSTGRESQL_SHARED_LIBADD)
 
-    swoole_source_file="swoole_postgresql_coro.cc"
+    swoole_source_file="swoole_postgresql.cc"
 
     PHP_NEW_EXTENSION(swoole_postgresql, $swoole_source_file, $ext_shared,,, cxx)
 
