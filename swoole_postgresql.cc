@@ -753,7 +753,7 @@ bool PGObject::yield(zval *_return_value, double timeout) {
     if (socket->events) {
         swoole_event_del(socket);
     }
-    co = nullptr;
+
     if (!success) {
         ZVAL_FALSE(_return_value);
 
@@ -768,9 +768,10 @@ bool PGObject::yield(zval *_return_value, double timeout) {
                                         ZEND_STRL("error"),
                                         swoole_strerror(SW_ERROR_CO_TIMEDOUT));
         }
-
+        co = nullptr;
         return false;
     }
+    co = nullptr;
     return true;
 }
 
