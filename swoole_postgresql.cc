@@ -38,7 +38,7 @@ struct Object {
     bool ignore_notices;
     bool log_notices;
 
-    bool yield(zval *_return_value, double timeout);
+    bool yield(zval *_return_value, EventType event, double timeout);
     bool wait_write_ready();
 };
 }  // namespace postgresql
@@ -169,8 +169,8 @@ static PHP_METHOD(swoole_postgresql_coro, fetchRow);
 static void php_pgsql_fetch_hash(INTERNAL_FUNCTION_PARAMETERS, zend_long result_type, int into_object);
 
 static void _free_result(zend_resource *rsrc);
-static int swoole_pgsql_coro_onRead(Reactor *reactor, Event *event);
-static int swoole_pgsql_coro_onWrite(Reactor *reactor, Event *event);
+static int swoole_pgsql_coro_onReadable(Reactor *reactor, Event *event);
+static int swoole_pgsql_coro_onWritable(Reactor *reactor, Event *event);
 static int swoole_pgsql_coro_onError(Reactor *reactor, Event *event);
 static int swoole_postgresql_coro_close(zval *zobject);
 static int query_result_parse(PGObject *object);
@@ -374,17 +374,12 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
     php_swoole_check_reactor();
 
     if (!swoole_event_isset_handler(PHP_SWOOLE_FD_POSTGRESQL)) {
-        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onRead);
-        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWrite);
+        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_READ, swoole_pgsql_coro_onReadable);
+        swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_WRITE, swoole_pgsql_coro_onWritable);
         swoole_event_set_handler(PHP_SWOOLE_FD_POSTGRESQL | SW_EVENT_ERROR, swoole_pgsql_coro_onError);
     }
 
     object->socket = swoole::make_socket(fd, (enum swFdType) PHP_SWOOLE_FD_POSTGRESQL);
-    if (swoole_event_add(object->socket, SW_EVENT_WRITE) < 0) {
-        php_swoole_fatal_error(E_WARNING, "swoole_event_add failed");
-        RETURN_FALSE;
-    }
-
     object->socket->object = object;
     object->conn = pgsql;
     object->status = CONNECTION_STARTED;
@@ -401,7 +396,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
         RETURN_FALSE;
     }
 
-    if (!object->yield(return_value, Socket::default_connect_timeout)) {
+    if (!object->yield(return_value, SW_EVENT_WRITE, Socket::default_connect_timeout)) {
         const char *feedback;
 
         switch (PQstatus(pgsql)) {
@@ -438,7 +433,7 @@ static void connect_callback(PGObject *object, Reactor *reactor, Event *event) {
     int events = 0;
     char *err_msg;
 
-    swoole_event_del(event->socket);
+    swoole_event_del(object->socket);
 
     if (status != CONNECTION_OK) {
         PostgresPollingStatusType flag = PQconnectPoll(conn);
@@ -465,6 +460,7 @@ static void connect_callback(PGObject *object, Reactor *reactor, Event *event) {
         }
 
         if (events) {
+            event->socket->fd = PQsocket(conn);
             swoole_event_add(event->socket, events);
             return;
         }
@@ -476,22 +472,23 @@ static void connect_callback(PGObject *object, Reactor *reactor, Event *event) {
     object->co->resume();
 }
 
-static int swoole_pgsql_coro_onWrite(Reactor *reactor, Event *event) {
+static int swoole_pgsql_coro_onWritable(Reactor *reactor, Event *event) {
     PGObject *object = (PGObject *) event->socket->object;
-    if (object->connected) {
-        if (object->co) {
-            object->co->resume();
-            return SW_OK;
-        } else {
-            return reactor->default_write_handler(reactor, event);
-        }
-    } else {
+
+    if (!object->connected) {
         connect_callback(object, reactor, event);
+        return SW_OK;
     }
-    return SW_OK;
+
+    if (object->co) {
+        object->co->resume();
+        return SW_OK;
+    } else {
+        return reactor->default_write_handler(reactor, event);
+    }
 }
 
-static int swoole_pgsql_coro_onRead(Reactor *reactor, Event *event) {
+static int swoole_pgsql_coro_onReadable(Reactor *reactor, Event *event) {
     PGObject *object = (PGObject *) (event->socket->object);
 
     if (!object->connected) {
@@ -728,11 +725,8 @@ static int prepare_result_parse(PGObject *object) {
 bool PGObject::wait_write_ready() {
     int retval = 0;
     while ((retval = PQflush(conn)) == 1) {
-        if (!socket->isset_writable_event() && swoole_event_add(socket, SW_EVENT_WRITE) == SW_ERR) {
-            return false;
-        }
         zval return_value;
-        if (!yield(&return_value, Socket::default_write_timeout)) {
+        if (!yield(&return_value, SW_EVENT_WRITE, Socket::default_write_timeout)) {
             return false;
         }
     }
@@ -746,15 +740,24 @@ bool PGObject::wait_write_ready() {
     return true;
 }
 
-bool PGObject::yield(zval *_return_value, double timeout) {
+bool PGObject::yield(zval *_return_value, EventType event, double timeout) {
     co = swoole::Coroutine::get_current_safe();
-    return_value = _return_value;
-    bool success = co->yield_ex(timeout);
-    if (socket->events) {
-        swoole_event_del(socket);
+    if (swoole_event_add(socket, event) < 0) {
+        php_swoole_fatal_error(E_WARNING, "swoole_event_add failed");
+        RETVAL_FALSE;
+        return false;
     }
-    co = nullptr;
-    if (!success) {
+
+    ON_SCOPE_EXIT {
+        co = nullptr;
+        if (!socket->removed && swoole_event_del(socket) < 0) {
+            php_swoole_fatal_error(E_WARNING, "swoole_event_del failed");
+        }
+    };
+
+    return_value = _return_value;
+
+    if (!co->yield_ex(timeout)) {
         ZVAL_FALSE(_return_value);
 
         if (co->is_canceled()) {
@@ -771,6 +774,7 @@ bool PGObject::yield(zval *_return_value, double timeout) {
 
         return false;
     }
+
     return true;
 }
 
@@ -802,11 +806,7 @@ static PHP_METHOD(swoole_postgresql_coro, query) {
         RETURN_FALSE;
     }
 
-    if (swoole_event_add(object->socket, SW_EVENT_READ) < 0) {
-        RETURN_FALSE;
-    }
-
-    object->yield(return_value, Socket::default_read_timeout);
+    object->yield(return_value, SW_EVENT_READ, Socket::default_read_timeout);
 }
 
 static PHP_METHOD(swoole_postgresql_coro, prepare) {
@@ -852,12 +852,7 @@ static PHP_METHOD(swoole_postgresql_coro, prepare) {
     if (!object->wait_write_ready()) {
         RETURN_FALSE;
     }
-
-    if (swoole_event_add(object->socket, SW_EVENT_READ) < 0) {
-        RETURN_FALSE;
-    }
-
-    object->yield(return_value, Socket::default_read_timeout);
+    object->yield(return_value, SW_EVENT_READ, Socket::default_read_timeout);
 }
 
 static PHP_METHOD(swoole_postgresql_coro, execute) {
@@ -933,16 +928,10 @@ static PHP_METHOD(swoole_postgresql_coro, execute) {
             RETURN_FALSE;
         }
     }
-
     if (!object->wait_write_ready()) {
         RETURN_FALSE;
     }
-
-    if (swoole_event_add(object->socket, SW_EVENT_READ) < 0) {
-        RETURN_FALSE;
-    }
-
-    object->yield(return_value, Socket::default_read_timeout);
+    object->yield(return_value, SW_EVENT_READ, Socket::default_read_timeout);
 }
 
 static void _php_pgsql_free_params(char **params, int num_params) {
@@ -1217,10 +1206,7 @@ static PHP_METHOD(swoole_postgresql_coro, metaData) {
         swoole_warning("error:[%s]", err_msg);
     }
     smart_str_free(&querystr);
-    if (swoole_event_add(object->socket, SW_EVENT_READ) < 0) {
-        RETURN_FALSE;
-    }
-    object->yield(return_value, Socket::default_read_timeout);
+    object->yield(return_value, SW_EVENT_READ, Socket::default_read_timeout);
 }
 
 /* {{{ void php_pgsql_fetch_hash */
