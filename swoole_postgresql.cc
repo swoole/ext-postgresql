@@ -784,6 +784,9 @@ static PHP_METHOD(swoole_postgresql_coro, query) {
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     PGObject *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    if (!object || !object->conn) {
+        RETURN_FALSE;
+    }
     object->request_type = PGQueryType::NORMAL_QUERY;
     pgsql = object->conn;
     object->object = ZEND_THIS;
@@ -821,6 +824,9 @@ static PHP_METHOD(swoole_postgresql_coro, prepare) {
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     PGObject *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    if (!object || !object->conn) {
+        RETURN_FALSE;
+    }
     object->request_type = PGQueryType::PREPARE;
     pgsql = object->conn;
     object->object = ZEND_THIS;
@@ -875,6 +881,9 @@ static PHP_METHOD(swoole_postgresql_coro, execute) {
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     PGObject *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    if (!object || !object->conn) {
+        RETURN_FALSE;
+    }
     object->request_type = PGQueryType::NORMAL_QUERY;
     pgsql = object->conn;
     object->object = ZEND_THIS;
@@ -1143,6 +1152,9 @@ static PHP_METHOD(swoole_postgresql_coro, metaData) {
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     PGObject *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    if (!object || !object->conn) {
+        RETURN_FALSE;
+    }
     object->request_type = PGQueryType::META_DATA;
     pgsql = object->conn;
     object->object = ZEND_THIS;
@@ -1276,6 +1288,9 @@ static void php_pgsql_fetch_hash(INTERNAL_FUNCTION_PARAMETERS, zend_long result_
     }
 
     pg_result = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    if (!pg_result || !pg_result->conn) {
+        RETURN_FALSE;
+    }
 
     if (use_row) {
         if (row < 0 || row >= PQntuples(pgsql_result)) {
@@ -1479,6 +1494,9 @@ static PHP_METHOD(swoole_postgresql_coro, escape) {
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     PGObject *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    if (!object || !object->conn) {
+        RETURN_FALSE;
+    }
     pgsql = object->conn;
 
     zend_string *result = zend_string_alloc(l_str * 2, 0);
@@ -1508,6 +1526,9 @@ static PHP_METHOD(swoole_postgresql_coro, escapeLiteral) {
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     PGObject *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    if (!object || !object->conn) {
+        RETURN_FALSE;
+    }
     pgsql = object->conn;
 
     tmp = PQescapeLiteral(pgsql, str, l_str);
@@ -1532,6 +1553,9 @@ static PHP_METHOD(swoole_postgresql_coro, escapeIdentifier) {
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     PGObject *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
+    if (!object || !object->conn) {
+        RETURN_FALSE;
+    }
     pgsql = object->conn;
 
     tmp = PQescapeIdentifier(pgsql, str, l_str);
