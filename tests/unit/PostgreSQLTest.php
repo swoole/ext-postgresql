@@ -75,4 +75,19 @@ class PostgreSQLTest extends TestCase
             $this->assertEquals($arr[0]['?column?1'], 22);
         });
     }
+
+    public function testNotConnected()
+    {
+        run(function () {
+            $pg = new Swoole\Coroutine\PostgreSQL();
+
+            $this->assertFalse($pg->escape(''));
+            $this->assertFalse($pg->escapeLiteral(''));
+            $this->assertFalse($pg->escapeIdentifier(''));
+            $this->assertFalse($pg->query(''));
+            $this->assertFalse($pg->prepare('', ''));
+            $this->assertFalse($pg->execute('', []));
+            $this->assertFalse($pg->metaData(''));
+        });
+    }
 }
