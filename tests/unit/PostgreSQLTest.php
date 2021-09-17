@@ -9,7 +9,7 @@ class PostgreSQLTest extends TestCase
     protected function getConn()
     {
         $pg = new Swoole\Coroutine\PostgreSQL();
-        $conn = $pg->connect(TEST_DB_URI);
+        $conn = $pg->connect(TEST_DB_URI, 5);
         $this->assertNotFalse($conn, (string) $pg->error);
 
         return $pg;

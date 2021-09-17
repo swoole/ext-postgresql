@@ -342,9 +342,12 @@ static PHP_METHOD(swoole_postgresql_coro, __construct) {}
 
 static PHP_METHOD(swoole_postgresql_coro, connect) {
     zval *conninfo;
+    double timeout = Socket::default_connect_timeout;
 
-    ZEND_PARSE_PARAMETERS_START(1, 1)
+    ZEND_PARSE_PARAMETERS_START(1, 2)
     Z_PARAM_ZVAL(conninfo)
+    Z_PARAM_OPTIONAL
+    Z_PARAM_DOUBLE(timeout)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     PGObject *object = php_swoole_postgresql_coro_get_object(ZEND_THIS);
@@ -402,7 +405,7 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
         RETURN_FALSE;
     }
 
-    if (!object->yield(return_value, SW_EVENT_WRITE, Socket::default_connect_timeout)) {
+    if (!object->yield(return_value, SW_EVENT_WRITE, timeout)) {
         const char *feedback;
 
         switch (PQstatus(pgsql)) {
