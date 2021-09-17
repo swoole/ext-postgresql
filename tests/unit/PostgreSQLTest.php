@@ -90,4 +90,14 @@ class PostgreSQLTest extends TestCase
             $this->assertFalse($pg->metaData(''));
         });
     }
+    
+    public function testConnectFailed()
+    {
+        run(function () {
+            $pg = new Swoole\Coroutine\PostgreSQL();
+            $this->assertFalse($pg->connect(''));
+            $conn = $pg->connect(TEST_DB_URI);
+            $this->assertNotFalse($conn, (string) $pg->error);
+        });
+    }
 }

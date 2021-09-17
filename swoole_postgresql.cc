@@ -385,6 +385,12 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
     object->status = CONNECTION_STARTED;
     object->connected = false;
 
+    ON_SCOPE_EXIT {
+        if (!object->connected) {
+            object->conn = NULL;
+        }
+    };
+
     PQsetnonblocking(pgsql, 1);
     PQsetNoticeProcessor(pgsql, _php_pgsql_notice_handler, object);
 
