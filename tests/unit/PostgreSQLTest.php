@@ -9,7 +9,7 @@ class PostgreSQLTest extends TestCase
     protected function getConn()
     {
         $pg = new Swoole\Coroutine\PostgreSQL();
-        $conn = $pg->connect(TEST_DB_URI);
+        $conn = $pg->connect(TEST_DB_URI, 5);
         $this->assertNotFalse($conn, (string) $pg->error);
 
         return $pg;
@@ -88,6 +88,16 @@ class PostgreSQLTest extends TestCase
             $this->assertFalse($pg->prepare('', ''));
             $this->assertFalse($pg->execute('', []));
             $this->assertFalse($pg->metaData(''));
+        });
+    }
+    
+    public function testConnectFailed()
+    {
+        run(function () {
+            $pg = new Swoole\Coroutine\PostgreSQL();
+            $this->assertFalse($pg->connect(''));
+            $conn = $pg->connect(TEST_DB_URI);
+            $this->assertNotFalse($conn, (string) $pg->error);
         });
     }
 }
