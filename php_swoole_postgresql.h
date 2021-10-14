@@ -21,8 +21,8 @@
 #include "ext/swoole/ext-src/php_swoole_cxx.h"
 #include "config.h"
 
-#define PHP_SWOOLE_EXT_PLUS_VERSION     "4.7.2"
-#define PHP_SWOOLE_EXT_PLUS_VERSION_ID  40702
+#define PHP_SWOOLE_EXT_PLUS_VERSION     "4.8.0"
+#define PHP_SWOOLE_EXT_PLUS_VERSION_ID  40800
 
 #if SWOOLE_API_VERSION_ID < 0x202109a
 #error "Ext version does not match the Swoole version"
