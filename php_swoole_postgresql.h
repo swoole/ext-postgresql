@@ -24,7 +24,7 @@
 #define PHP_SWOOLE_EXT_PLUS_VERSION     "4.8.0"
 #define PHP_SWOOLE_EXT_PLUS_VERSION_ID  40800
 
-#if SWOOLE_API_VERSION_ID < 0x202109a
+#if SWOOLE_VERSION_ID < 40800
 #error "Ext version does not match the Swoole version"
 #endif
 
