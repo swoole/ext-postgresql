@@ -28,13 +28,7 @@
 #error "Ext version does not match the Swoole version"
 #endif
 
-#ifdef __APPLE__
 #include <libpq-fe.h>
-#endif
-
-#ifdef __linux__
-#include <postgresql/libpq-fe.h>
-#endif
 
 #include <zend_portability.h>
 
