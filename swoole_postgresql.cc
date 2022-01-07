@@ -998,7 +998,11 @@ static inline void php_pgsql_get_field_value(
 #endif
             {
                 zend_long long_value;
+#if PHP_VERSION_ID < 80100
                 ZEND_ATOL(long_value, element);
+#else
+                long_value = ZEND_ATOL(element);
+#endif
                 ZVAL_LONG(value, long_value);
                 break;
             }
