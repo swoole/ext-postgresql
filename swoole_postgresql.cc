@@ -277,7 +277,6 @@ static const zend_function_entry swoole_postgresql_coro_methods[] =
 void swoole_postgresql_init(int module_number) {
     SW_INIT_CLASS_ENTRY(swoole_postgresql_coro,
                         "Swoole\\Coroutine\\PostgreSQL",
-                        NULL,
                         "Co\\PostgreSQL",
                         swoole_postgresql_coro_methods);
 #ifdef SW_SET_CLASS_NOT_SERIALIZABLE
